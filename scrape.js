@@ -12,6 +12,7 @@ async function scrapeWebsite() {
         // Check if any elements with the class "fr-card" exist 
         const numberOfLogements = $('.fr-card').length
         const frCardExists =  numberOfLogements > 0;
+        const aucunLogementTrouve = $('body').text().includes('Aucun logement trouvé');
 
         const now = new Date();
         const hours = now.getHours();
@@ -20,8 +21,11 @@ async function scrapeWebsite() {
 
         if (frCardExists) {
             await sendEmail(`${numberOfLogements}`);
-        } else {
+        } else if (aucunLogementTrouve) {
             console.log('Pas de logement');
+            console.log(`Current time: ${hours}:${minutes}:${seconds}`);
+        } else {
+            console.log('Attention your script is not running correctly')
             console.log(`Current time: ${hours}:${minutes}:${seconds}`);
         }
     } catch (error) {
