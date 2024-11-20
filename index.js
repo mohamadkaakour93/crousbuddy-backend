@@ -17,7 +17,6 @@ if (!process.env.MONGO_URI || !process.env.JWT_SECRET) {
 
 // Middleware
 app.use(express.json());
-app.use('/api/user', userRoutes);
 app.use(cors());
 
 // Connexion à MongoDB Atlas
@@ -30,6 +29,7 @@ mongoose.connect(process.env.MONGO_URI)
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/user', userRoutes);
 
 
 // Middleware global pour gérer les erreurs
