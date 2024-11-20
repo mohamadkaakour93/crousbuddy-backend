@@ -2,33 +2,39 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import authMiddleware from '../middleware/auth.js';
-import scrapeWebsite from '../scrape.js';
+import { scrapeWebsite } from '../scrape.js';
 
 const router = express.Router();
 
-router.post('/search', async (req, res) => {
-    const { city, occupationModes } = req.body;
-
-    if (!city || !occupationModes) {
-        return res.status(400).json({ message: 'Ville et mode d\'occupation requis.' });
-    }
-
+router.post('/search', authMiddleware, async (req, res) => {
     try {
-        const tempUser = {
-            email: 'temp@user.com', // Simuler un utilisateur temporaire
-            preferences: { city, occupationModes },
+        const { city, occupationModes } = req.body;
+
+        // Vérifiez si les paramètres de recherche sont présents
+        if (!city || !occupationModes) {
+            return res.status(400).json({ message: 'Ville et mode d\'occupation sont requis.' });
+        }
+
+        // Construire l'utilisateur fictif à partir des préférences envoyées
+        const user = {
+            email: req.user.email, // Obtenu à partir du token JWT via authMiddleware
+            preferences: { city, occupationModes }
         };
 
-        const results = await scrapeWebsite(tempUser);
+        // Effectuer le scraping pour cet utilisateur
+        const result = await scrapeWebsite(user);
 
-        if (results.length > 0) {
-            res.json({ message: `Nous avons trouvé ${results.length} logements !`, results });
+        if (result.logements && result.logements.length > 0) {
+            return res.status(200).json({
+                message: `${result.logements.length} logements trouvés.`,
+                logements: result.logements
+            });
         } else {
-            res.status(404).json({ message: 'Aucun logement trouvé pour le moment.' });
+            return res.status(200).json({ message: 'Aucun logement trouvé pour le moment.' });
         }
     } catch (error) {
         console.error('Erreur lors de la recherche :', error.message);
-        res.status(500).json({ message: 'Erreur interne du serveur.' });
+        return res.status(500).json({ message: 'Erreur serveur lors de la recherche.' });
     }
 });
 

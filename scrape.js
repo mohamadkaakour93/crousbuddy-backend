@@ -2,10 +2,10 @@ import axios from 'axios';
 import * as cheerio from 'cheerio';
 import nodemailer from 'nodemailer';
 import pLimit from 'p-limit';
+import User from './models/User.js'; // Import du modèle User
 
-// États séparés pour chaque utilisateur
 const userStates = new Map();
-const cityCache = new Map(); // Cache pour les coordonnées des villes
+const cityCache = new Map();
 
 // Configuration SMTP
 const transporter = nodemailer.createTransport({
@@ -18,7 +18,7 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-// Fonction pour envoyer un e-mail
+// Envoi des emails
 async function sendEmail(to, subject, text) {
     try {
         const info = await transporter.sendMail({
@@ -33,135 +33,82 @@ async function sendEmail(to, subject, text) {
     }
 }
 
-// Fonction pour obtenir les coordonnées d'une ville
+// Obtenir les coordonnées de la ville
 async function getCityBounds(city) {
     if (cityCache.has(city)) return cityCache.get(city);
 
-    try {
-        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(city)}`;
-        const { data } = await axios.get(url, {
-            headers: { 'User-Agent': 'CROUS Buddy/1.0 (crousbuddy@gmail.com)' }
-        });
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(city)}`;
+    const { data } = await axios.get(url);
+    if (data.length === 0) throw new Error(`Ville introuvable : ${city}`);
 
-        if (data.length === 0) throw new Error(`Ville introuvable : ${city}`);
-
-        const { boundingbox } = data[0];
-        const bounds = `${boundingbox[2]}_${boundingbox[1]}_${boundingbox[3]}_${boundingbox[0]}`;
-        cityCache.set(city, bounds);
-        return bounds;
-    } catch (error) {
-        console.error(`Erreur lors de la récupération des bounds pour ${city} :`, error.message);
-        throw error;
-    }
+    const { boundingbox } = data[0];
+    const bounds = `${boundingbox[2]}_${boundingbox[1]}_${boundingbox[3]}_${boundingbox[0]}`;
+    cityCache.set(city, bounds);
+    return bounds;
 }
 
-// Fonction pour générer l'URL de recherche CROUS
+// URL de recherche CROUS
 async function generateCrousUrl(city, occupationModes) {
     const bounds = await getCityBounds(city);
-    const baseUrl = 'https://trouverunlogement.lescrous.fr/tools/37/search?';
     const params = new URLSearchParams();
-
     params.set('bounds', bounds);
     if (occupationModes) params.set('occupationModes', occupationModes);
-
-    return baseUrl + params.toString();
+    return `https://trouverunlogement.lescrous.fr/tools/37/search?${params.toString()}`;
 }
 
-// Fonction principale de scraping
-async function scrapeWebsite(user) {
+// Scraper le site
+ export async function scrapeWebsite(user) {
     const { email, preferences } = user;
     const { city, occupationModes } = preferences;
 
     if (!userStates.has(email)) {
         userStates.set(email, {
             notifiedLogements: new Set(),
-            isBlocked: false, // Indique si cet utilisateur ne doit plus recevoir de notifications
-            noLogementMailSent: false // Indique si l'e-mail "aucun logement trouvé" a été envoyé
+            isBlocked: false,
+            noLogementMailSent: false
         });
     }
 
     const userState = userStates.get(email);
+    if (userState.isBlocked) return;
 
-    // Si l'utilisateur est bloqué, ignorer cette recherche
-    if (userState.isBlocked) {
-        console.log(`Utilisateur ${email} est bloqué. Aucune recherche effectuée.`);
-        return [];
-    }
+    const url = await generateCrousUrl(city, occupationModes);
+    const { data } = await axios.get(url);
+    const $ = cheerio.load(data);
 
-    try {
-        const url = await generateCrousUrl(city, occupationModes);
-        console.log(`[${new Date().toISOString()}] Lancement du scraping pour ${email} avec ${url}`);
+    const logements = [];
+    $('.fr-card').each((index, element) => {
+        const title = $(element).find('.fr-card__title').text().trim();
+        const link = `https://trouverunlogement.lescrous.fr${$(element).find('a').attr('href')}`;
+        logements.push({ title, link });
+    });
 
-        const { data } = await axios.get(url);
-        const $ = cheerio.load(data);
+    const nouveauxLogements = logements.filter((logement) => !userState.notifiedLogements.has(logement.link));
+    if (nouveauxLogements.length > 0) {
+        for (const logement of nouveauxLogements) userState.notifiedLogements.add(logement.link);
 
-        const baseUrl = 'https://trouverunlogement.lescrous.fr';
-        const logements = [];
-        $('.fr-card').each((index, element) => {
-            const title = $(element).find('.fr-card__title').text().trim();
-            const link = baseUrl + $(element).find('a').attr('href');
-            logements.push({ title, link });
-        });
-
-        const logementsTrouves = logements.filter(
-            (logement) => !userState.notifiedLogements.has(logement.link)
-        );
-
-        if (logementsTrouves.length > 0) {
-            logementsTrouves.forEach((logement) =>
-                userState.notifiedLogements.add(logement.link)
-            );
-
-            const message = `
-Bonjour,
-
-Merci pour votre confiance en CROUS Buddy.
-
-Voici les résultats pour votre recherche :
-- Ville : ${city}
-- Mode d'occupation : ${occupationModes}
-
-Nous avons trouvé ${logementsTrouves.length} nouveaux logements correspondant à vos critères :
-
-${logementsTrouves.map((l) => `- ${l.title}\nLien : ${l.link}`).join('\n\n')}
-
-Cordialement,  
-L'équipe CROUS Buddy
-`;
-            await sendEmail(email, 'Nouveaux logements trouvés', message);
-            console.log(`E-mail envoyé à ${email} avec ${logementsTrouves.length} logements.`);
-
-            userState.isBlocked = true;
-            userState.noLogementMailSent = false;
-            console.log(`Utilisateur ${email} bloqué après l'envoi d'un e-mail de succès.`);
-        } else if (!userState.noLogementMailSent) {
-            const noLogementMessage = `
-Bonjour,
-
-Merci pour votre confiance en CROUS Buddy.
-
-Voici les résultats pour votre recherche :
-- Ville : ${city}
-- Mode d'occupation : ${occupationModes}
-
-Actuellement, aucun logement correspondant à vos critères n'est disponible.  
-Nous continuerons à surveiller les disponibilités et vous tiendrons informé dès qu’un logement sera trouvé.
-
-Cordialement,  
-L'équipe CROUS Buddy
-`;
-            await sendEmail(email, 'Pas de logement disponible pour l\'instant', noLogementMessage);
-            userState.noLogementMailSent = true;
-            console.log(`E-mail envoyé à ${email} : Aucun logement disponible.`);
-        } else {
-            console.log(`Aucun logement trouvé pour ${email}. Nouvelle tentative dans 5 minutes.`);
-        }
-
-        return logementsTrouves; // Retourner les logements trouvés pour les réponses en temps réel
-    } catch (error) {
-        console.error(`Erreur lors du scraping pour ${email} :`, error.message);
-        return [];
+        const message = `Nous avons trouvé ${nouveauxLogements.length} nouveaux logements...`;
+        await sendEmail(email, 'Logements trouvés', message);
+        userState.isBlocked = true;
+        userState.noLogementMailSent = false;
+    } else if (!userState.noLogementMailSent) {
+        await sendEmail(email, 'Aucun logement', 'Aucun logement trouvé...');
+        userState.noLogementMailSent = true;
     }
 }
 
-export default scrapeWebsite;
+// Récupérer les utilisateurs depuis MongoDB
+async function getUsersFromDB() {
+    return User.find({}, { email: 1, preferences: 1 });
+}
+
+// Processus principal
+setInterval(async () => {
+    const users = await getUsersFromDB();
+    if (users.length > 0) {
+        const limit = pLimit(5);
+        await Promise.all(users.map((user) => limit(() => scrapeWebsite(user))));
+    } else {
+        console.log('Aucun utilisateur trouvé.');
+    }
+}, 60000);
