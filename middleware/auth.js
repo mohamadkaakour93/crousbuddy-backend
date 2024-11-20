@@ -1,6 +1,4 @@
-const jwt = require('jsonwebtoken');
-
-module.exports = function (req, res, next) {
+export default function (req, res, next) {
     const authHeader = req.header('Authorization'); // Récupère l'en-tête Authorization
     console.log('Authorization Header:', authHeader);
 
