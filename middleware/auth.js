@@ -1,26 +1,19 @@
 import jwt from 'jsonwebtoken';
+import config from 'config';
 
 const authMiddleware = (req, res, next) => {
-    const authHeader = req.headers['authorization']; // Récupère l'en-tête Authorization
+  const token = req.header('x-auth-token');
+  if (!token) {
+    return res.status(401).json({ message: 'No token, authorization denied' });
+  }
 
-    if (!authHeader) {
-        return res.status(401).json({ message: 'Accès refusé. Aucun jeton fourni.' });
-    }
-
-    const token = authHeader.split(' ')[1]; // Supprime "Bearer" et récupère uniquement le token
-
-    if (!token) {
-        return res.status(401).json({ message: 'Token manquant. Accès non autorisé.' });
-    }
-
-    try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET); // Vérifie et décode le token
-        req.user = decoded; // Stocke les données du token dans req.user
-        next();
-    } catch (error) {
-        console.error('Erreur JWT:', error);
-        res.status(401).json({ message: 'Token invalide.' });
-    }
+  try {
+    const decoded = jwt.verify(token, config.get('jwtSecret'));
+    req.user = decoded.user; // Assurez-vous que ceci est correctement défini
+    next();
+  } catch (err) {
+    res.status(401).json({ message: 'Token is not valid' });
+  }
 };
 
 export default authMiddleware;

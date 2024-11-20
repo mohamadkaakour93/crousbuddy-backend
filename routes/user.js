@@ -8,14 +8,19 @@ const router = express.Router();
 
 router.post('/search', authMiddleware, async (req, res) => {
     try {
+        console.log('req.user:', req.user); // Pour déboguer
         const { city, occupationModes } = req.body;
 
         if (!city || !occupationModes) {
             return res.status(400).json({ message: 'Ville et mode d\'occupation sont requis.' });
         }
 
+        if (!req.user || !req.user.email) {
+            return res.status(401).json({ message: 'Utilisateur non authentifié.' });
+        }
+
         const user = {
-            email: req.user.email, // Récupéré depuis le token
+            email: req.user.email,
             preferences: { city, occupationModes },
         };
 
