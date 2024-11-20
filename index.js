@@ -27,6 +27,9 @@ mongoose.connect(process.env.MONGO_URI)
         process.exit(1); // Arrête l'application si la connexion échoue
     });
 
+const userRoutes = require('./routes/user');
+const authRoutes = require('./routes/auth');
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
