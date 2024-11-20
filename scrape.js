@@ -36,7 +36,9 @@ async function getCityBounds(city) {
     if (cityCache.has(city)) return cityCache.get(city);
 
     const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(city)}`;
-    const { data } = await axios.get(url);
+    const { data } = await axios.get(url, {
+        headers: { 'User-Agent': 'CROUS Buddy/1.0 (crousbuddy@gmail.com)' }
+        });
 
     if (data.length === 0) throw new Error(`Ville introuvable : ${city}`);
 
