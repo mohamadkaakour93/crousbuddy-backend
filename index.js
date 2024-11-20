@@ -17,8 +17,11 @@ if (!process.env.MONGO_URI || !process.env.JWT_SECRET) {
 
 // Middleware
 app.use(express.json());
-app.use(cors());
-
+app.use(cors({
+    origin: 'http://localhost:4200',
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 // Connexion à MongoDB Atlas
 mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log('✅ Connecté à MongoDB Atlas'))
