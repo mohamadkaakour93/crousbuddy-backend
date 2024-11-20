@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth.js';
 import cors from 'cors';
+import userRoutes from './routes/user.js';
 
 dotenv.config();
 
@@ -16,6 +17,7 @@ if (!process.env.MONGO_URI || !process.env.JWT_SECRET) {
 
 // Middleware
 app.use(express.json());
+app.use('/api/user', userRoutes);
 app.use(cors());
 
 // Connexion à MongoDB Atlas
@@ -28,6 +30,7 @@ mongoose.connect(process.env.MONGO_URI)
 
 // Routes
 app.use('/api/auth', authRoutes);
+
 
 // Middleware global pour gérer les erreurs
 app.use((err, req, res, next) => {

@@ -101,15 +101,5 @@ router.post(
     }
 );
 
-// Route protégée : Obtenir les informations de l'utilisateur connecté
-router.get('/me', authMiddleware, async (req, res) => {
-    try {
-        const user = await User.findById(req.user.id).select('-password');
-        res.json(user);
-    } catch (error) {
-        console.error(error.message);
-        res.status(500).send('Erreur serveur.');
-    }
-});
 
 export default router;
