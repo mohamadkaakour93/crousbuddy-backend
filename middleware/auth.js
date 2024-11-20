@@ -1,13 +1,13 @@
-export default function (req, res, next) {
-    const authHeader = req.header('Authorization'); // Récupère l'en-tête Authorization
-    console.log('Authorization Header:', authHeader);
+import jwt from 'jsonwebtoken';
+
+const authMiddleware = (req, res, next) => {
+    const authHeader = req.headers['authorization']; // Récupère l'en-tête Authorization
 
     if (!authHeader) {
-        return res.status(401).json({ message: 'Accès refusé. Aucun token fourni.' });
+        return res.status(401).json({ message: 'Accès refusé. Aucun jeton fourni.' });
     }
 
-    // Vérifie si l'en-tête commence par 'Bearer' et extrait le token
-    const token = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+    const token = authHeader.split(' ')[1]; // Supprime "Bearer" et récupère uniquement le token
 
     if (!token) {
         return res.status(401).json({ message: 'Token manquant. Accès non autorisé.' });
@@ -18,6 +18,9 @@ export default function (req, res, next) {
         req.user = decoded; // Stocke les données du token dans req.user
         next();
     } catch (error) {
+        console.error('Erreur JWT:', error);
         res.status(401).json({ message: 'Token invalide.' });
     }
 };
+
+export default authMiddleware;
