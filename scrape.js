@@ -3,8 +3,6 @@ import * as cheerio from 'cheerio';
 import nodemailer from 'nodemailer';
 import pLimit from 'p-limit';
 
-
-
 // États séparés pour chaque utilisateur
 const userStates = new Map();
 const cityCache = new Map(); // Cache pour les coordonnées des villes
@@ -87,7 +85,7 @@ async function scrapeWebsite(user) {
     // Si l'utilisateur est bloqué, ignorer cette recherche
     if (userState.isBlocked) {
         console.log(`Utilisateur ${email} est bloqué. Aucune recherche effectuée.`);
-        return;
+        return [];
     }
 
     try {
@@ -133,12 +131,10 @@ L'équipe CROUS Buddy
             await sendEmail(email, 'Nouveaux logements trouvés', message);
             console.log(`E-mail envoyé à ${email} avec ${logementsTrouves.length} logements.`);
 
-            // Bloquer l'utilisateur après avoir envoyé un e-mail de succès
             userState.isBlocked = true;
-            userState.noLogementMailSent = false; // Réinitialiser l'état pour "aucun logement"
+            userState.noLogementMailSent = false;
             console.log(`Utilisateur ${email} bloqué après l'envoi d'un e-mail de succès.`);
         } else if (!userState.noLogementMailSent) {
-            // Aucun logement trouvé, envoyer une seule fois
             const noLogementMessage = `
 Bonjour,
 
@@ -155,28 +151,17 @@ Cordialement,
 L'équipe CROUS Buddy
 `;
             await sendEmail(email, 'Pas de logement disponible pour l\'instant', noLogementMessage);
-            userState.noLogementMailSent = true; // Marquer comme envoyé
+            userState.noLogementMailSent = true;
             console.log(`E-mail envoyé à ${email} : Aucun logement disponible.`);
         } else {
             console.log(`Aucun logement trouvé pour ${email}. Nouvelle tentative dans 5 minutes.`);
         }
+
+        return logementsTrouves; // Retourner les logements trouvés pour les réponses en temps réel
     } catch (error) {
         console.error(`Erreur lors du scraping pour ${email} :`, error.message);
+        return [];
     }
 }
 
-// Fonction pour gérer tous les utilisateurs
-async function processUsers(users) {
-    for (const user of users) {
-        await scrapeWebsite(user);
-    }
-}
-
-const users = [
-    { email: 'mhamadelkaakour@gmail.com', preferences: { city: 'Montpellier', occupationModes: 'alone' } },
-    { email: 'cocokouki93@gmail.com', preferences: { city: 'Pau', occupationModes: 'alone' } },
-    { email: 'user3@example.com', preferences: { city: 'Lyon', occupationModes: 'couple' } }
-];
-
-// Exécuter toutes les 5 minutes
-setInterval(() => processUsers(users), 30000); // Toutes les 5 minutes
+export default scrapeWebsite;

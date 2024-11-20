@@ -2,8 +2,35 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import authMiddleware from '../middleware/auth.js';
+import scrapeWebsite from '../scrape.js';
 
 const router = express.Router();
+
+router.post('/search', async (req, res) => {
+    const { city, occupationModes } = req.body;
+
+    if (!city || !occupationModes) {
+        return res.status(400).json({ message: 'Ville et mode d\'occupation requis.' });
+    }
+
+    try {
+        const tempUser = {
+            email: 'temp@user.com', // Simuler un utilisateur temporaire
+            preferences: { city, occupationModes },
+        };
+
+        const results = await scrapeWebsite(tempUser);
+
+        if (results.length > 0) {
+            res.json({ message: `Nous avons trouvé ${results.length} logements !`, results });
+        } else {
+            res.status(404).json({ message: 'Aucun logement trouvé pour le moment.' });
+        }
+    } catch (error) {
+        console.error('Erreur lors de la recherche :', error.message);
+        res.status(500).json({ message: 'Erreur interne du serveur.' });
+    }
+});
 
 // Obtenir les informations du profil utilisateur (GET /api/user/me)
 router.get('/me', authMiddleware, async (req, res) => {
