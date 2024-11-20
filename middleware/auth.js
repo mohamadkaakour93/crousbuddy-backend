@@ -1,14 +1,13 @@
 import jwt from 'jsonwebtoken';
 
 export default function authMiddleware(req, res, next) {
-    const authHeader = req.headers['authorization']; // Récupère l'en-tête Authorization
+    const authHeader = req.headers['authorization'];
     console.log('Authorization Header:', authHeader);
 
     if (!authHeader) {
         return res.status(401).json({ message: 'Accès refusé. Aucun token fourni.' });
     }
 
-    // Vérifie si l'en-tête commence par 'Bearer' et extrait le token
     const token = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
 
     if (!token) {
@@ -17,9 +16,11 @@ export default function authMiddleware(req, res, next) {
 
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET); // Vérifie et décode le token
-        req.user = decoded; // Stocke les données du token dans req.user
+        req.user = decoded; // Stocke les données dans req.user
+        console.log('req.user:', req.user);
         next();
     } catch (error) {
+        console.error('Erreur lors de la vérification du token:', error.message);
         res.status(401).json({ message: 'Token invalide.' });
     }
 }
