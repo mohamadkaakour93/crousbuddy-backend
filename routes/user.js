@@ -2,9 +2,9 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import { scrapeWebsite } from '../scrape.js';
+import authMiddleware from '../middleware/auth.js';
 
 const router = express.Router();
-const authMiddleware = require('./middleware/auth');
 
 router.post('/search', authMiddleware, async (req, res) => {
     try {
