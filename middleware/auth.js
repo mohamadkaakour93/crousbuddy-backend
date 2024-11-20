@@ -1,18 +1,21 @@
+// middleware/auth.js
+
 import jwt from 'jsonwebtoken';
-import config from 'config';
+// import config from 'config'; // Supprimé
 
 const authMiddleware = (req, res, next) => {
   const token = req.header('x-auth-token');
   if (!token) {
-    return res.status(401).json({ message: 'No token, authorization denied' });
+    return res.status(401).json({ message: 'Aucun token, autorisation refusée.' });
   }
 
   try {
-    const decoded = jwt.verify(token, config.get('jwtSecret'));
-    req.user = decoded.user; // Assurez-vous que ceci est correctement défini
+    const jwtSecret = process.env.JWT_SECRET || 'votre_clé_secrète_par_défaut';
+    const decoded = jwt.verify(token, jwtSecret);
+    req.user = decoded.user;
     next();
   } catch (err) {
-    res.status(401).json({ message: 'Token is not valid' });
+    res.status(401).json({ message: 'Token invalide.' });
   }
 };
 
