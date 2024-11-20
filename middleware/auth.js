@@ -1,10 +1,17 @@
-// middleware/auth.js
-
 import jwt from 'jsonwebtoken';
-// import config from 'config'; // Supprimé
 
 const authMiddleware = (req, res, next) => {
-  const token = req.header('x-auth-token');
+  // Essayer d'obtenir le token depuis le header 'x-auth-token'
+  let token = req.header('x-auth-token');
+
+  // Si le token n'est pas présent, essayer de le récupérer depuis 'Authorization'
+  if (!token) {
+    const authHeader = req.header('Authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7); // Supprime 'Bearer ' pour obtenir le token
+    }
+  }
+
   if (!token) {
     return res.status(401).json({ message: 'Aucun token, autorisation refusée.' });
   }
@@ -15,6 +22,7 @@ const authMiddleware = (req, res, next) => {
     req.user = decoded.user;
     next();
   } catch (err) {
+    console.error('Erreur lors de la vérification du token :', err);
     res.status(401).json({ message: 'Token invalide.' });
   }
 };
