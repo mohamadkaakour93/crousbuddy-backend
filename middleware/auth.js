@@ -1,38 +1,25 @@
-// middleware/auth.js
+const jwt = require('jsonwebtoken');
 
-import jwt from 'jsonwebtoken';
+module.exports = function (req, res, next) {
+    const authHeader = req.header('Authorization'); // Récupère l'en-tête Authorization
+    console.log('Authorization Header:', authHeader);
 
-const authMiddleware = (req, res, next) => {
-  console.log('Headers reçus :', req.headers);
-
-  let token = req.header('x-auth-token');
-  console.log('Token initial depuis x-auth-token:', token);
-
-  if (!token) {
-    const authHeader = req.header('Authorization');
-    console.log('Header Authorization:', authHeader);
-
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      token = authHeader.substring(7);
-      console.log('Token extrait depuis Authorization:', token);
+    if (!authHeader) {
+        return res.status(401).json({ message: 'Accès refusé. Aucun token fourni.' });
     }
-  }
 
-  if (!token) {
-    console.log('Aucun token trouvé');
-    return res.status(401).json({ message: 'Token manquant. Accès non autorisé.' });
-  }
+    // Vérifie si l'en-tête commence par 'Bearer' et extrait le token
+    const token = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
 
-  try {
-    const jwtSecret = process.env.JWT_SECRET || 'votre_clé_secrète_par_défaut';
-    const decoded = jwt.verify(token, jwtSecret);
-    console.log('Token décodé:', decoded);
-    req.user = decoded;
-    next();
-  } catch (err) {
-    console.error('Erreur lors de la vérification du token :', err);
-    res.status(401).json({ message: 'Token invalide.' });
-  }
+    if (!token) {
+        return res.status(401).json({ message: 'Token manquant. Accès non autorisé.' });
+    }
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET); // Vérifie et décode le token
+        req.user = decoded; // Stocke les données du token dans req.user
+        next();
+    } catch (error) {
+        res.status(401).json({ message: 'Token invalide.' });
+    }
 };
-
-export default authMiddleware;
