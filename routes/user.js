@@ -50,9 +50,9 @@ const router = express.Router();
     }
   });*/ 
 
-  router.post('/search', authMiddleware, async (req, res) => {
+router.post('/search', authMiddleware, async (req, res) => {
     try {
-      const userId = req.user.id; // Récupérer l'ID de l'utilisateur connecté
+      const userId = req.user.id; // ID de l'utilisateur connecté
       const user = await User.findById(userId);
   
       if (!user) {
@@ -82,23 +82,36 @@ const router = express.Router();
       };
   
       // Ajouter immédiatement à la file d'attente
-      addUserToQueue(userPreferences);
+      try {
+        addUserToQueue(userPreferences);
+      } catch (queueError) {
+        console.error(`Erreur lors de l'ajout de l'utilisateur à la file d'attente : ${queueError.message}`);
+        return res.status(500).json({
+          message: 'Erreur lors de l’ajout de la recherche à la file d’attente.',
+        });
+      }
   
       // Lancer immédiatement le scraping
-      const logements = await scrapeWebsite(userPreferences);
-  
-      if (logements.length > 0) {
-        return res.status(200).json({
-          message: `Nous avons trouvé ${logements.length} nouveaux logements. Vous recevrez un e-mail avec les détails.`,
-          logements,
-        });
-      } else {
-        return res.status(200).json({
-          message: 'Aucun logement trouvé pour le moment. Nous continuerons à chercher pour vous.',
+      try {
+        const logements = await scrapeWebsite(userPreferences);
+        if (logements.length > 0) {
+          return res.status(200).json({
+            message: `Nous avons trouvé ${logements.length} nouveaux logements. Vous recevrez un e-mail avec les détails.`,
+            logements,
+          });
+        } else {
+          return res.status(200).json({
+            message: 'Aucun logement trouvé pour le moment. Nous continuerons à chercher pour vous.',
+          });
+        }
+      } catch (scrapeError) {
+        console.error(`Erreur lors du scraping initial : ${scrapeError.message}`);
+        return res.status(500).json({
+          message: 'Erreur lors du lancement initial de la recherche.',
         });
       }
     } catch (error) {
-      console.error('Erreur lors de la recherche :', error.message);
+      console.error('Erreur générale lors de la recherche :', error.message);
       return res.status(500).json({
         message: 'Erreur serveur lors de la recherche.',
       });
