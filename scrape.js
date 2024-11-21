@@ -5,6 +5,8 @@ import User from "./models/User.js";
 
 // État pour chaque utilisateur
 const userStates = new Map(); // Stocke l'état pour chaque utilisateur
+const cityCache = new Map(); // Cache pour les coordonnées des villes
+
 
 // Configuration SMTP pour l'envoi d'e-mails
 const transporter = nodemailer.createTransport({
