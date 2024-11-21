@@ -167,9 +167,10 @@ async function startSearchLoop(userId) {
     }
   }
   console.log(`Recherche terminée pour l'utilisateur avec l'ID ${userId}.`);
+  userStates.delete(userId); // Nettoyage de l'état utilisateur
 }
-console.log(`Recherche terminée pour l'utilisateur avec l'ID ${userId}.`);
-userStates.delete(userId); // Nettoyage de l'état utilisateur
+
+
 
 
 // Fonction pour gérer les utilisateurs en parallèle
