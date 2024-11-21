@@ -137,7 +137,7 @@ L'équipe CROUS Buddy
     }
   };
 
-  userState.intervalId = setInterval(performScrape, 60000); // 1 minute
+  userState.intervalId = setInterval(performScrape, 15000); // 1 minute
 }
 
 // Fonction pour gérer un utilisateur depuis la base de données
