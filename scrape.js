@@ -2,23 +2,14 @@ import axios from "axios";
 import * as cheerio from "cheerio";
 import nodemailer from "nodemailer";
 import Queue from "bull";
-import Redis from "ioredis";
 
-// Configuration Redis
-const redisUrl = process.env.REDIS_URL || "redis://red-csvhhobtq21c73ep4efg:6379";
-const redisClient = new Redis(redisUrl);
-
-// Gestion des erreurs Redis
-redisClient.on("error", (err) => {
-  console.error("Erreur Redis :", err);
-});
-
-// Configuration Bull Queue
+// Configuration Redis pour Bull
+const redisUrl = process.env.REDIS_URL || "redis://127.0.0.1:6379";
 const userQueue = new Queue("userQueue", redisUrl);
 
-userQueue.on("error", (err) => {
-  console.error("Erreur dans la file d'attente :", err);
-});
+// État pour chaque utilisateur connecté
+const userStates = new Map();
+const cityCache = new Map(); // Cache pour les coordonnées des villes
 
 // Configuration SMTP
 const transporter = nodemailer.createTransport({
@@ -46,10 +37,7 @@ async function sendEmail(to, subject, text) {
   }
 }
 
-// Cache pour les coordonnées des villes
-const cityCache = new Map();
-
-// Obtenir les coordonnées de la ville
+// Fonction pour obtenir les coordonnées d'une ville
 async function getCityBounds(city) {
   if (cityCache.has(city)) return cityCache.get(city);
 
@@ -68,7 +56,7 @@ async function getCityBounds(city) {
   return bounds;
 }
 
-// Générer l'URL de recherche CROUS
+// Fonction pour générer l'URL de recherche CROUS
 async function generateCrousUrl(city, occupationModes) {
   const bounds = await getCityBounds(city);
   const params = new URLSearchParams();
@@ -78,57 +66,89 @@ async function generateCrousUrl(city, occupationModes) {
 }
 
 // Fonction principale pour le scraping
-async function scrapeWebsite(user) {
+export async function scrapeWebsite(user) {
   const { email, preferences } = user;
   const { city, occupationModes } = preferences;
 
-  try {
-    const url = await generateCrousUrl(city, occupationModes);
-    console.log(`[${new Date().toISOString()}] Scraping pour ${email} : ${url}`);
-
-    const { data } = await axios.get(url);
-    const $ = cheerio.load(data);
-
-    const logements = [];
-    $(".fr-card").each((index, element) => {
-      const title = $(element).find(".fr-card__title").text().trim();
-      const link = `https://trouverunlogement.lescrous.fr${$(element)
-        .find("a")
-        .attr("href")}`;
-      logements.push({ title, link });
+  if (!userStates.has(email)) {
+    userStates.set(email, {
+      notifiedLogements: new Set(),
+      noLogementMailSent: false,
+      intervalId: null, // Pour stocker l'intervalle
     });
-
-    return logements;
-  } catch (error) {
-    console.error(`Erreur lors du scraping pour ${email} :`, error.message);
-    throw error;
   }
-}
 
-// Traitement de la file d'attente
-userQueue.process(async (job) => {
-  const user = job.data;
-  const logements = await scrapeWebsite(user);
+  const userState = userStates.get(email);
 
-  if (logements.length > 0) {
-    const message = `
+  const performScrape = async () => {
+    try {
+      const url = await generateCrousUrl(city, occupationModes);
+      console.log(`[${new Date().toISOString()}] Scraping pour ${email} : ${url}`);
+
+      const { data } = await axios.get(url);
+      const $ = cheerio.load(data);
+
+      const logements = [];
+      $(".fr-card").each((index, element) => {
+        const title = $(element).find(".fr-card__title").text().trim();
+        const link = `https://trouverunlogement.lescrous.fr${$(element).find("a").attr("href")}`;
+        logements.push({ title, link });
+      });
+
+      const nouveauxLogements = logements.filter(
+        (logement) => !userState.notifiedLogements.has(logement.link)
+      );
+
+      if (nouveauxLogements.length > 0) {
+        for (const logement of nouveauxLogements)
+          userState.notifiedLogements.add(logement.link);
+
+        const message = `
 Bonjour,
 
-Nous avons trouvé ${logements.length} nouveaux logements correspondant à vos critères :
-- Ville : ${user.preferences.city}
-- Mode d'occupation : ${user.preferences.occupationModes}
+Nous avons trouvé ${nouveauxLogements.length} nouveaux logements correspondant à vos critères :
+- Ville : ${city}
+- Mode d'occupation : ${occupationModes}
 
 Voici les détails :
-${logements.map((l) => `- ${l.title}\nLien : ${l.link}`).join("\n\n")}
+${nouveauxLogements.map((l) => `- ${l.title}\nLien : ${l.link}`).join("\n\n")}
 
 Cordialement,
 L'équipe CROUS Buddy
-    `;
-    await sendEmail(user.email, "Nouveaux logements trouvés", message);
-    console.log(`Logements trouvés pour ${user.email}. Notification envoyée.`);
-  } else {
-    console.log(`Aucun logement trouvé pour ${user.email}.`);
-  }
+        `;
+        await sendEmail(email, "Nouveaux logements trouvés", message);
+        console.log(`Logements trouvés pour ${email}. Notification envoyée.`);
+        clearInterval(userState.intervalId); // Arrêter le scraping pour cet utilisateur
+        userStates.delete(email);
+      } else if (!userState.noLogementMailSent) {
+        const noLogementMessage = `
+Bonjour,
+
+Aucun logement correspondant à vos critères n'est disponible pour le moment.
+Nous continuons à chercher pour vous. Vous serez notifié dès qu’un logement sera trouvé.
+
+Cordialement,
+L'équipe CROUS Buddy
+        `;
+        await sendEmail(email, "Aucun logement disponible", noLogementMessage);
+        userState.noLogementMailSent = true;
+        console.log(`Notification "aucun logement" envoyée à ${email}.`);
+      } else {
+        console.log(`Aucun logement trouvé pour ${email}. Recherche toujours en cours.`);
+      }
+    } catch (error) {
+      console.error(`Erreur lors du scraping pour ${email} :`, error.message);
+    }
+  };
+
+  // Lancer le scraping toutes les demi minutes
+  userState.intervalId = setInterval(performScrape, 30000);
+}
+
+// File d'attente avec Bull
+userQueue.process(async (job) => {
+  const user = job.data;
+  await scrapeWebsite(user);
 });
 
 // Ajouter un utilisateur à la file d'attente
