@@ -2,11 +2,11 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import {authMiddleware} from '../middleware/auth.js';
-import { scrapeWebsite } from '../scrape.js';
+import { handleUserSearch } from '../scrape.js';
 
 const router = express.Router();
 
-router.post('/search', authMiddleware, async (req, res) => {
+/*router.post('/search', authMiddleware, async (req, res) => {
     try {
       const userId = req.user.id; // ID de l'utilisateur connecté récupéré depuis le middleware
       const user = await User.findById(userId);
@@ -47,7 +47,23 @@ router.post('/search', authMiddleware, async (req, res) => {
         message: "Erreur serveur lors de la recherche.",
       });
     }
+  });*/ 
+
+router.post('/search', authMiddleware, async (req, res) => {
+    try {
+      const userId = req.user.id; // Obtenu depuis le token JWT
+      handleUserSearch(userId); // Lancer la recherche pour cet utilisateur
+      res.status(200).json({
+        message:
+          'La recherche a été lancée. Vous recevrez un e-mail dès qu’un logement sera trouvé.',
+      });
+    } catch (error) {
+      console.error('Erreur lors du lancement de la recherche :', error.message);
+      res.status(500).json({ message: 'Erreur serveur.' });
+    }
   });
+  
+
 
 // Mettre à jour le profil utilisateur (PUT /api/user/me)
 router.put('/me', authMiddleware, async (req, res) => {

@@ -1,8 +1,9 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import nodemailer from 'nodemailer';
+import User from './models/User.js'; // Import du modèle User pour récupérer les infos par ID
 
-// État pour chaque utilisateur connecté
+// État des utilisateurs
 const userStates = new Map();
 const cityCache = new Map();
 
@@ -58,8 +59,8 @@ async function generateCrousUrl(city, occupationModes) {
   return `https://trouverunlogement.lescrous.fr/tools/37/search?${params.toString()}`;
 }
 
-// Fonction principale de scraping
-export async function scrapeWebsite(user) {
+// Scraper les logements pour un utilisateur
+async function scrapeWebsite(user) {
   const { email, preferences } = user;
   const { city, occupationModes } = preferences;
 
@@ -67,7 +68,7 @@ export async function scrapeWebsite(user) {
     userStates.set(email, {
       notifiedLogements: new Set(),
       noLogementMailSent: false,
-      intervalId: null, // Pour stocker l'intervalle
+      intervalId: null,
     });
   }
 
@@ -93,8 +94,9 @@ export async function scrapeWebsite(user) {
       );
 
       if (nouveauxLogements.length > 0) {
-        for (const logement of nouveauxLogements)
+        for (const logement of nouveauxLogements) {
           userState.notifiedLogements.add(logement.link);
+        }
 
         const message = `
 Bonjour,
@@ -111,7 +113,8 @@ L'équipe CROUS Buddy
 `;
         await sendEmail(email, 'Nouveaux logements trouvés', message);
         console.log(`Logements trouvés pour ${email}. Notification envoyée.`);
-        clearInterval(userState.intervalId); // Arrêter le scraping pour cet utilisateur
+
+        clearInterval(userState.intervalId); // Arrêter le scraping
         userStates.delete(email);
       } else if (!userState.noLogementMailSent) {
         const noLogementMessage = `
@@ -134,6 +137,19 @@ L'équipe CROUS Buddy
     }
   };
 
-  // Lancer le scraping toutes les 5 minutes
-  userState.intervalId = setInterval(performScrape, 30000); // 5 minutes
+  userState.intervalId = setInterval(performScrape, 60000); // 1 minute
+}
+
+// Fonction pour gérer un utilisateur depuis la base de données
+export async function handleUserSearch(userId) {
+  try {
+    const user = await User.findById(userId).select('email preferences');
+    if (!user) throw new Error("Utilisateur introuvable");
+
+    // Lancer le scraping pour cet utilisateur
+    scrapeWebsite(user);
+    console.log(`Scraping lancé pour ${user.email}`);
+  } catch (error) {
+    console.error(`Erreur lors du traitement de l'utilisateur ${userId} :`, error.message);
+  }
 }
