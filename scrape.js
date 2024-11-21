@@ -3,10 +3,11 @@ import * as cheerio from "cheerio";
 import nodemailer from "nodemailer";
 import User from "./models/User.js";
 
-// État pour chaque utilisateur
-const userStates = new Map(); // Stocke l'état pour chaque utilisateur
+// États pour chaque utilisateur (stockage temporaire)
+const userStates = new Map();
+const cityCache = new Map(); // Cache pour les coordonnées des villes
 
-// Configuration SMTP pour l'envoi d'e-mails
+// Configuration SMTP pour envoyer des e-mails
 const transporter = nodemailer.createTransport({
   host: "smtp-relay.brevo.com",
   port: 587,
@@ -32,10 +33,35 @@ async function sendEmail(to, subject, text) {
   }
 }
 
+// Fonction pour obtenir les coordonnées (bounds) d'une ville
+async function getCityBounds(city) {
+  if (cityCache.has(city)) return cityCache.get(city);
+
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+      city
+    )}`;
+    const { data } = await axios.get(url, {
+      headers: { "User-Agent": "CROUS Buddy/1.0 (crousbuddy@gmail.com)" },
+    });
+
+    if (data.length === 0) throw new Error(`Ville introuvable : ${city}`);
+
+    const { boundingbox } = data[0];
+    const bounds = `${boundingbox[2]}_${boundingbox[1]}_${boundingbox[3]}_${boundingbox[0]}`;
+    cityCache.set(city, bounds);
+    return bounds;
+  } catch (error) {
+    console.error(`Erreur lors de la récupération des bounds pour ${city} :`, error.message);
+    throw error;
+  }
+}
+
 // Fonction pour générer l'URL de recherche CROUS
 async function generateCrousUrl(city, occupationModes) {
+  const bounds = await getCityBounds(city); // Obtenez les coordonnées de la ville
   const params = new URLSearchParams();
-  params.set("bounds", city); // Coordonnées de la ville
+  params.set("bounds", bounds);
   if (occupationModes) params.set("occupationModes", occupationModes);
   return `https://trouverunlogement.lescrous.fr/tools/37/search?${params.toString()}`;
 }
@@ -43,7 +69,7 @@ async function generateCrousUrl(city, occupationModes) {
 // Fonction principale de scraping
 async function scrapeWebsite(userId) {
   try {
-    // Récupérer les informations utilisateur
+    // Récupérer l'utilisateur à partir de la base de données
     const user = await User.findById(userId).select("email preferences");
     if (!user) {
       console.error(`Utilisateur avec l'ID ${userId} introuvable.`);
@@ -55,7 +81,7 @@ async function scrapeWebsite(userId) {
 
     // Générer l'URL de recherche
     const url = await generateCrousUrl(city, occupationModes);
-    console.log(`Scraping pour ${email} : ${url}`);
+    console.log(`[${new Date().toISOString()}] Scraping pour ${email} : ${url}`);
 
     // Effectuer le scraping
     const { data } = await axios.get(url);
@@ -69,6 +95,8 @@ async function scrapeWebsite(userId) {
         .attr("href")}`;
       logements.push({ title, link });
     });
+
+    const userState = userStates.get(userId);
 
     if (logements.length > 0) {
       const message = `
@@ -87,11 +115,9 @@ L'équipe CROUS Buddy
       await sendEmail(email, "Nouveaux logements trouvés", message);
       console.log(`Logements trouvés pour ${email}. Notification envoyée.`);
       return true; // Recherche terminée pour cet utilisateur
-    } else {
+    } else if (!userState.noLogementMailSent) {
       // Si aucun logement n'est trouvé, envoyer un e-mail une seule fois
-      const userState = userStates.get(userId);
-      if (!userState.noLogementMailSent) {
-        const noLogementMessage = `
+      const noLogementMessage = `
 Bonjour,
 
 Actuellement, aucun logement correspondant à vos critères n'est disponible.
@@ -99,14 +125,14 @@ Nous continuerons à chercher et vous tiendrons informé dès qu’un logement s
 
 Cordialement,
 L'équipe CROUS Buddy
-        `;
-        await sendEmail(email, "Aucun logement disponible", noLogementMessage);
-        userState.noLogementMailSent = true; // Marquer que l'e-mail a été envoyé
-        console.log(`Notification "aucun logement" envoyée à ${email}.`);
-      }
-      console.log(`Aucun logement trouvé pour ${email}. Nouvelle tentative dans 30 secondes.`);
-      return false; // Continuer la recherche
+      `;
+      await sendEmail(email, "Aucun logement disponible", noLogementMessage);
+      userState.noLogementMailSent = true; // Marquer que l'e-mail a été envoyé
+      console.log(`Notification "aucun logement" envoyée à ${email}.`);
     }
+
+    console.log(`Aucun logement trouvé pour ${email}. Nouvelle tentative dans 30 secondes.`);
+    return false; // Continuer la recherche
   } catch (error) {
     console.error(`Erreur lors du scraping pour l'utilisateur avec l'ID ${userId} :`, error.message);
     return false;
