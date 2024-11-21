@@ -34,28 +34,27 @@ async function sendEmail(to, subject, text) {
 }
 
 // Fonction pour obtenir les coordonnées (bounds) d'une ville
+// Fonction pour obtenir les coordonnées d'une ville
 async function getCityBounds(city) {
   if (cityCache.has(city)) return cityCache.get(city);
-
+  
   try {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-      city
-    )}`;
-    const { data } = await axios.get(url, {
-      headers: { "User-Agent": "CROUS Buddy/1.0 (crousbuddy@gmail.com)" },
-    });
-
-    if (data.length === 0) throw new Error(`Ville introuvable : ${city}`);
-
-    const { boundingbox } = data[0];
-    const bounds = `${boundingbox[2]}_${boundingbox[1]}_${boundingbox[3]}_${boundingbox[0]}`;
-    cityCache.set(city, bounds);
-    return bounds;
+  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(city)}`;
+  const { data } = await axios.get(url, {
+  headers: { 'User-Agent': 'CROUS Buddy/1.0 (crousbuddy@gmail.com)' }
+  });
+  
+  if (data.length === 0) throw new Error(`Ville introuvable : ${city}`);
+  
+  const { boundingbox } = data[0];
+  const bounds = `${boundingbox[2]}_${boundingbox[1]}_${boundingbox[3]}_${boundingbox[0]}`;
+  cityCache.set(city, bounds);
+  return bounds;
   } catch (error) {
-    console.error(`Erreur lors de la récupération des bounds pour ${city} :`, error.message);
-    throw error;
+  console.error(`Erreur lors de la récupération des bounds pour ${city} :`, error.message);
+  throw error;
   }
-}
+  }
 
 // Fonction pour générer l'URL de recherche CROUS
 async function generateCrousUrl(city, occupationModes) {
