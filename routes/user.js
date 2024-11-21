@@ -3,7 +3,6 @@ import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import {authMiddleware} from '../middleware/auth.js';
 import { scrapeWebsite } from '../scrape.js';
-import { addUserToQueue } from '../scrape.js';
 
 const router = express.Router();
 
