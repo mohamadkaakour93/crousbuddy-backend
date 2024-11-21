@@ -1,8 +1,9 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
+import {addUserToQueue} from '../scrape.js';
 import {authMiddleware} from '../middleware/auth.js';
-import { handleUserSearch } from '../scrape.js';
+
 
 const router = express.Router();
 
@@ -51,18 +52,47 @@ const router = express.Router();
 
 router.post('/search', authMiddleware, async (req, res) => {
     try {
-      const userId = req.user.id; // Obtenu depuis le token JWT
-      handleUserSearch(userId); // Lancer la recherche pour cet utilisateur
-      res.status(200).json({
-        message:
-          'La recherche a été lancée. Vous recevrez un e-mail dès qu’un logement sera trouvé.',
-      });
+        const userId = req.user.id; // ID de l'utilisateur connecté récupéré depuis le middleware
+        const user = await User.findById(userId);
+
+        if (!user) {
+            return res.status(404).json({ message: "Utilisateur non trouvé." });
+        }
+
+        const { city, occupationModes } = req.body;
+
+        // Vérification des paramètres
+        if (!city || !occupationModes) {
+            return res.status(400).json({
+                message: "Les champs 'city' et 'occupationModes' sont obligatoires.",
+            });
+        }
+
+        // Mise à jour des préférences de l'utilisateur dans la base
+        user.preferences.city = city;
+        user.preferences.occupationModes = occupationModes;
+        await user.save();
+
+        // Ajouter l'utilisateur à la file d'attente pour le scraping
+        addUserToQueue({
+            email: user.email,
+            preferences: {
+                city: user.preferences.city,
+                occupationModes: user.preferences.occupationModes,
+            },
+        });
+
+        return res.status(200).json({
+            message:
+                "La recherche a été lancée. Vous recevrez un e-mail dès qu’un logement sera trouvé.",
+        });
     } catch (error) {
-      console.error('Erreur lors du lancement de la recherche :', error.message);
-      res.status(500).json({ message: 'Erreur serveur.' });
+        console.error('Erreur lors du lancement de la recherche :', error.message);
+        return res.status(500).json({
+            message: "Erreur serveur lors de la recherche.",
+        });
     }
-  });
-  
+});
 
 
 // Mettre à jour le profil utilisateur (PUT /api/user/me)
