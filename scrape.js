@@ -1,3 +1,15 @@
+const cityCache = new Map([
+  ["Paris", "2.224122_48.902156_2.4697602_48.8155755"],
+  ["Montpellier", "3.8070597_43.6533542_3.9413208_43.5667088"],
+  ["Pau", "0.3925513_43.3580393_-0.2943049_43.2857792"],
+  ["Lyon", "4.7718134_45.8082628_4.8983774_45.7073666"],
+  ["Marseille", "5.2286902_43.3910329_5.5324758_43.1696205"],
+  ["Grenoble", "5.6776059_45.2140762_5.7531176_45.1541442"],
+  ["Nice", "7.1819535_43.7607635_7.323912_43.6454189"]
+
+]);
+
+
 import axios from "axios";
 import * as cheerio from "cheerio";
 import nodemailer from "nodemailer";
@@ -5,7 +17,6 @@ import User from "./models/User.js";
 
 // États pour chaque utilisateur (stockage temporaire)
 const userStates = new Map();
-const cityCache = new Map(); // Cache pour les coordonnées des villes
 
 // Configuration SMTP pour envoyer des e-mails
 const transporter = nodemailer.createTransport({
