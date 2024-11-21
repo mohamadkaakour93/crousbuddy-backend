@@ -8,35 +8,18 @@ const router = express.Router();
 
 router.post('/search', authMiddleware, async (req, res) => {
     try {
-        const { city, occupationModes } = req.body;
-
-        // Vérifiez si les paramètres de recherche sont présents
-        if (!city || !occupationModes) {
-            return res.status(400).json({ message: 'Ville et mode d\'occupation sont requis.' });
-        }
-
-        // Construire l'utilisateur fictif à partir des préférences envoyées
-        const user = {
-            email: req.user.email, // Obtenu à partir du token JWT via authMiddleware
-            preferences: { city, occupationModes }
-        };
-
-        // Effectuer le scraping pour cet utilisateur
-        const result = await scrapeWebsite(user);
-
-        if (result.logements && result.logements.length > 0) {
-            return res.status(200).json({
-                message: `${result.logements.length} logements trouvés.`,
-                logements: result.logements
-            });
-        } else {
-            return res.status(200).json({ message: 'Aucun logement trouvé pour le moment.' });
-        }
+      const user = {
+        email: req.user.email,
+        preferences: req.user.preferences,
+      };
+  
+      addUserToQueue(user); // Ajouter l'utilisateur à la queue pour le scraping
+      res.status(200).json({ message: 'La recherche a été lancée. Vous recevrez un e-mail dès qu’un logement sera trouvé.' });
     } catch (error) {
-        console.error('Erreur lors de la recherche :', error.message);
-        return res.status(500).json({ message: 'Erreur serveur lors de la recherche.' });
+      console.error('Erreur lors de la recherche :', error.message);
+      res.status(500).json({ message: 'Erreur serveur lors de la recherche.' });
     }
-});
+  });
 
 // Obtenir les informations du profil utilisateur (GET /api/user/me)
 router.get('/me', authMiddleware, async (req, res) => {
