@@ -1,11 +1,7 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import nodemailer from 'nodemailer';
-
-// File d'attente et état utilisateur
-const userQueue = [];
-const userStates = new Map();
-const cityCache = new Map();
+import pLimit from 'p-limit';
 
 // Configuration SMTP
 const transporter = nodemailer.createTransport({
@@ -17,6 +13,14 @@ const transporter = nodemailer.createTransport({
     pass: 'q4mj6RNO507thbTW',
   },
 });
+
+// État global pour la file d'attente
+const userQueue = [];
+const userStates = new Map();
+const cityCache = new Map();
+
+// Limitation de concurrence
+const limit = pLimit(5); // Limite à 5 utilisateurs en parallèle
 
 // Fonction pour envoyer un e-mail
 async function sendEmail(to, subject, text) {
@@ -59,8 +63,8 @@ async function generateCrousUrl(city, occupationModes) {
   return `https://trouverunlogement.lescrous.fr/tools/37/search?${params.toString()}`;
 }
 
-// Fonction principale de scraping
-async function scrapeWebsite(user) {
+// Fonction pour effectuer le scraping
+async function performScrape(user) {
   const { email, preferences } = user;
   const { city, occupationModes } = preferences;
 
@@ -110,7 +114,6 @@ L'équipe CROUS Buddy
 `;
       await sendEmail(email, 'Nouveaux logements trouvés', message);
       console.log(`Logements trouvés pour ${email}. Notification envoyée.`);
-      return true; // Logement trouvé
     } else if (!userState.noLogementMailSent) {
       const noLogementMessage = `
 Bonjour,
@@ -130,36 +133,27 @@ L'équipe CROUS Buddy
   } catch (error) {
     console.error(`Erreur lors du scraping pour ${email} :`, error.message);
   }
-  return false; // Pas encore trouvé
 }
 
-// Gestion de la file d'attente
+// Fonction pour ajouter un utilisateur à la file d'attente
+export function scrapeWebsite(user) {
+  userQueue.push(user);
+  console.log(`Utilisateur ${user.email} ajouté à la file d'attente.`);
+}
+
+// Fonction pour traiter la file d'attente
 async function processQueue() {
   if (userQueue.length === 0) {
-    console.log('La queue est vide. En attente de nouveaux utilisateurs.');
+    console.log('La file d\'attente est vide.');
     return;
   }
 
-  const user = userQueue.shift();
-  console.log(`Traitement de la recherche pour : ${user.email}`);
+  console.log(`Traitement de la file d'attente : ${userQueue.length} utilisateur(s) en attente.`);
+  await Promise.all(userQueue.map((user) => limit(() => performScrape(user))));
 
-  const result = await scrapeWebsite(user);
-  if (!result) {
-    // Si aucun logement trouvé, remettre l'utilisateur en queue
-    userQueue.push(user);
-  }
+  // Une fois le traitement terminé, vide la queue
+  userQueue.length = 0;
 }
 
-// Ajouter un utilisateur à la file d'attente
-export function addUserToQueue(user) {
-  const isAlreadyInQueue = userQueue.some((u) => u.email === user.email);
-  if (isAlreadyInQueue) {
-    console.log(`Utilisateur ${user.email} est déjà dans la file d'attente.`);
-  } else {
-    console.log(`Utilisateur ${user.email} ajouté à la file d'attente.`);
-    userQueue.push(user);
-  }
-}
-
-// Lancer le processus de traitement
-setInterval(processQueue, 30000); // Toutes les 30 secondes
+// Lancer un intervalle pour traiter la file d'attente toutes les 30 secondes
+setInterval(processQueue, 30000);

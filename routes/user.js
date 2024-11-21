@@ -1,7 +1,7 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
-import {addUserToQueue} from '../scrape.js';
+import {scrapeWebsite} from '../scrape.js';
 import {authMiddleware} from '../middleware/auth.js';
 
 
@@ -60,17 +60,20 @@ router.post('/search', authMiddleware, async (req, res) => {
   
       const { city, occupationModes } = req.body;
   
+      // Vérification des paramètres
       if (!city || !occupationModes) {
         return res.status(400).json({
           message: "Les champs 'city' et 'occupationModes' sont obligatoires.",
         });
       }
   
+      // Mise à jour des préférences de l'utilisateur dans la base
       user.preferences.city = city;
       user.preferences.occupationModes = occupationModes;
       await user.save();
   
-      addUserToQueue({
+      // Ajouter l'utilisateur à la file d'attente pour le scraping
+      scrapeWebsite({
         email: user.email,
         preferences: {
           city: user.preferences.city,
