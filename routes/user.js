@@ -1,7 +1,8 @@
 import express from 'express';
 import User from '../models/User.js';
-import { addUserToSearch } from "./scrape.js";
 import { authMiddleware } from '../middleware/auth.js';
+import {addUserToSearch} from '../scrape.js';
+
 
 const router = express.Router();
 
@@ -48,13 +49,13 @@ const router = express.Router();
     }
   });*/
 
-router.post("/search", authMiddleware, (req, res) => {
-  const userId = req.user.id; // ID de l'utilisateur connecté récupéré depuis le middleware
-  addUserToSearch(userId); // Ajouter l'utilisateur à la recherche continue
-  res.status(200).json({
-    message: "Votre recherche automatique a été lancée. Vous recevrez un e-mail dès qu'un logement sera trouvé.",
+  router.post("/search", authMiddleware, (req, res) => {
+    const userId = req.user.id; // ID de l'utilisateur connecté récupéré depuis le middleware
+    addUserToSearch(userId); // Ajouter l'utilisateur à la recherche continue
+    res.status(200).json({
+      message: "Votre recherche automatique a été lancée. Vous recevrez un e-mail dès qu'un logement sera trouvé.",
+    });
   });
-});
 
   
 
