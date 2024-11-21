@@ -1,18 +1,11 @@
 import axios from "axios";
 import * as cheerio from "cheerio";
 import nodemailer from "nodemailer";
-import Queue from "bull";
+import express from "express";
+import authMiddleware from "../middleware/auth.js"; // Middleware d'authentification
+import User from "../models/User.js"; // Modèle User
 
-// Configuration Redis
-const userQueue = new Queue("userQueue", {
-  redis: {
-    host: "frankfurt-redis.render.com", // Hôte Redis fourni par Render
-    port: 6379, // Port Redis
-    password: "MQNqEUvkbolnqOVchdcZFqBTqkmgJIpS", // Mot de passe Redis
-  },
-});
-
-// État des utilisateurs
+// État pour chaque utilisateur connecté
 const userStates = new Map();
 const cityCache = new Map();
 
@@ -75,32 +68,40 @@ export async function scrapeWebsite(user) {
   const { email, preferences } = user;
   const { city, occupationModes } = preferences;
 
-  try {
-    const url = await generateCrousUrl(city, occupationModes);
-    console.log(`[${new Date().toISOString()}] Scraping pour ${email} : ${url}`);
-
-    const { data } = await axios.get(url);
-    const $ = cheerio.load(data);
-
-    const logements = [];
-    $(".fr-card").each((index, element) => {
-      const title = $(element).find(".fr-card__title").text().trim();
-      const link = `https://trouverunlogement.lescrous.fr${$(element)
-        .find("a")
-        .attr("href")}`;
-      logements.push({ title, link });
+  if (!userStates.has(email)) {
+    userStates.set(email, {
+      notifiedLogements: new Set(),
+      noLogementMailSent: false,
+      intervalId: null,
     });
+  }
 
-    const userState = userStates.get(email);
-    const nouveauxLogements = logements.filter(
-      (logement) => !userState.notifiedLogements.has(logement.link)
-    );
+  const userState = userStates.get(email);
 
-    if (nouveauxLogements.length > 0) {
-      for (const logement of nouveauxLogements)
-        userState.notifiedLogements.add(logement.link);
+  const performScrape = async () => {
+    try {
+      const url = await generateCrousUrl(city, occupationModes);
+      console.log(`[${new Date().toISOString()}] Scraping pour ${email} : ${url}`);
 
-      const message = `
+      const { data } = await axios.get(url);
+      const $ = cheerio.load(data);
+
+      const logements = [];
+      $(".fr-card").each((index, element) => {
+        const title = $(element).find(".fr-card__title").text().trim();
+        const link = `https://trouverunlogement.lescrous.fr${$(element).find("a").attr("href")}`;
+        logements.push({ title, link });
+      });
+
+      const nouveauxLogements = logements.filter(
+        (logement) => !userState.notifiedLogements.has(logement.link)
+      );
+
+      if (nouveauxLogements.length > 0) {
+        for (const logement of nouveauxLogements)
+          userState.notifiedLogements.add(logement.link);
+
+        const message = `
 Bonjour,
 
 Nous avons trouvé ${nouveauxLogements.length} nouveaux logements correspondant à vos critères :
@@ -112,11 +113,13 @@ ${nouveauxLogements.map((l) => `- ${l.title}\nLien : ${l.link}`).join("\n\n")}
 
 Cordialement,
 L'équipe CROUS Buddy
-      `;
-      await sendEmail(email, "Nouveaux logements trouvés", message);
-      console.log(`Logements trouvés pour ${email}. Notification envoyée.`);
-    } else if (!userState.noLogementMailSent) {
-      const noLogementMessage = `
+        `;
+        await sendEmail(email, "Nouveaux logements trouvés", message);
+        console.log(`Logements trouvés pour ${email}. Notification envoyée.`);
+        clearInterval(userState.intervalId); // Arrêter le scraping pour cet utilisateur
+        userStates.delete(email);
+      } else if (!userState.noLogementMailSent) {
+        const noLogementMessage = `
 Bonjour,
 
 Aucun logement correspondant à vos critères n'est disponible pour le moment.
@@ -124,33 +127,17 @@ Nous continuons à chercher pour vous. Vous serez notifié dès qu’un logement
 
 Cordialement,
 L'équipe CROUS Buddy
-      `;
-      await sendEmail(email, "Aucun logement disponible", noLogementMessage);
-      userState.noLogementMailSent = true;
-      console.log(`Notification "aucun logement" envoyée à ${email}.`);
-    } else {
-      console.log(`Aucun logement trouvé pour ${email}. Recherche toujours en cours.`);
+        `;
+        await sendEmail(email, "Aucun logement disponible", noLogementMessage);
+        userState.noLogementMailSent = true;
+        console.log(`Notification "aucun logement" envoyée à ${email}.`);
+      } else {
+        console.log(`Aucun logement trouvé pour ${email}. Recherche toujours en cours.`);
+      }
+    } catch (error) {
+      console.error(`Erreur lors du scraping pour ${email} :`, error.message);
     }
-  } catch (error) {
-    console.error(`Erreur lors du scraping pour ${email} :`, error.message);
-    throw error;
-  }
-}
+  };
 
-// Traitement de la file d'attente
-userQueue.process(5, async (job) => {
-  const user = job.data;
-  if (!userStates.has(user.email)) {
-    userStates.set(user.email, {
-      notifiedLogements: new Set(),
-      noLogementMailSent: false,
-    });
-  }
-  await scrapeWebsite(user);
-});
-
-// Ajouter un utilisateur à la file d'attente
-export function addUserToQueue(user) {
-  userQueue.add(user, { attempts: 5, backoff: 30000 });
-  console.log(`Utilisateur ${user.email} ajouté à la file d'attente.`);
+  userState.intervalId = setInterval(performScrape, 30000);
 }
