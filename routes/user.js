@@ -5,7 +5,7 @@ import { scrapeWebsite } from '../scrape.js';
 import { authMiddleware } from '../middleware/auth.js';
 const router = express.Router();
 
-router.post('/search', authMiddleware, async (req, res) => {
+/*router.post('/search', authMiddleware, async (req, res) => {
     try {
       const userId = req.user.id; // ID de l'utilisateur connecté récupéré depuis le middleware
       const user = await User.findById(userId);
@@ -45,6 +45,20 @@ router.post('/search', authMiddleware, async (req, res) => {
       return res.status(500).json({
         message: "Erreur serveur lors de la recherche.",
       });
+    }
+  });*/
+
+router.post('/search', authMiddleware, async (req, res) => {
+    try {
+      const userId = req.user.id; // Récupéré depuis le middleware auth
+      scrapeWebsite(userId); // Lancer le scraping pour cet utilisateur
+  
+      res.status(200).json({
+        message: "La recherche a été lancée. Vous recevrez un e-mail dès qu’un logement sera trouvé.",
+      });
+    } catch (error) {
+      console.error('Erreur lors de la recherche :', error.message);
+      res.status(500).json({ message: "Erreur serveur lors de la recherche." });
     }
   });
 
