@@ -2,46 +2,52 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import {authMiddleware} from '../middleware/auth.js';
-import { addUserToQueue } from '../scrape.js';
+import { scrapeWebsite } from '../scrape.js';
 
 const router = express.Router();
 
 router.post('/search', authMiddleware, async (req, res) => {
     try {
-      const { city, occupationModes } = req.body;
+      const userId = req.user.id; // ID de l'utilisateur connecté récupéré depuis le middleware
+      const user = await User.findById(userId);
   
-      if (!city || !occupationModes) {
-        return res.status(400).json({ message: 'Ville et mode d\'occupation sont requis.' });
+      if (!user) {
+        return res.status(404).json({ message: "Utilisateur non trouvé." });
       }
   
-      addUserToQueue({
-        email: req.user.email, // Email récupéré depuis le middleware
+      const { city, occupationModes } = req.body;
+  
+      // Vérification des paramètres
+      if (!city || !occupationModes) {
+        return res.status(400).json({
+          message: "Les champs 'city' et 'occupationModes' sont obligatoires.",
+        });
+      }
+  
+      // Mise à jour des préférences de l'utilisateur dans la base
+      user.preferences.city = city;
+      user.preferences.occupationModes = occupationModes;
+      await user.save();
+  
+      // Déclenchement du scraping pour cet utilisateur
+      scrapeWebsite({
+        email: user.email,
         preferences: {
-          city,
-          occupationModes,
+          city: user.preferences.city,
+          occupationModes: user.preferences.occupationModes,
         },
       });
   
-      res.status(200).json({ message: 'La recherche a été lancée. Vous recevrez un e-mail dès qu’un logement sera trouvé.' });
+      return res.status(200).json({
+        message: "La recherche a été lancée. Vous recevrez un e-mail dès qu’un logement sera trouvé.",
+      });
     } catch (error) {
-      console.error('Erreur lors de la recherche :', error.message);
-      res.status(500).json({ message: 'Erreur serveur lors de la recherche.' });
+      console.error('Erreur lors du lancement de la recherche :', error.message);
+      return res.status(500).json({
+        message: "Erreur serveur lors de la recherche.",
+      });
     }
   });
-
-// Obtenir les informations du profil utilisateur (GET /api/user/me)
-router.get('/me', authMiddleware, async (req, res) => {
-    try {
-        const user = await User.findById(req.user.id).select('-password');
-        if (!user) {
-            return res.status(404).json({ message: 'Utilisateur non trouvé.' });
-        }
-        res.status(200).json(user);
-    } catch (error) {
-        console.error('Erreur lors de la récupération du profil utilisateur:', error);
-        res.status(500).json({ message: 'Erreur serveur.' });
-    }
-});
 
 // Mettre à jour le profil utilisateur (PUT /api/user/me)
 router.put('/me', authMiddleware, async (req, res) => {
