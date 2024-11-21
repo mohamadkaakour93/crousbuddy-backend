@@ -82,14 +82,14 @@ router.post('/search', authMiddleware, async (req, res) => {
       };
   
       // Ajouter immédiatement à la file d'attente
-      try {
+      /*try {
         addUserToQueue(userPreferences);
       } catch (queueError) {
         console.error(`Erreur lors de l'ajout de l'utilisateur à la file d'attente : ${queueError.message}`);
         return res.status(500).json({
           message: 'Erreur lors de l’ajout de la recherche à la file d’attente.',
         });
-      }
+      }*/
   
       // Lancer immédiatement le scraping
       try {
