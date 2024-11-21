@@ -26,6 +26,7 @@
     "mongodb": "^6.10.0",
     "mongoose": "^8.8.2",
     "nodemailer": "^6.9.16",
-    "p-limit": "^6.1.0"
+    "p-limit": "^6.1.0",
+    "redis": "^4.7.0"
   }
 }
