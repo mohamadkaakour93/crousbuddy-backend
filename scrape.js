@@ -141,4 +141,4 @@ async function sendEmail(to, subject, text) {
     } else {
       console.log('La queue est vide. En attente de nouveaux utilisateurs.');
     }
-  }, 300000); // Exécution toutes les 5 minutes
+  }, 30000); // Exécution toutes les 5 minutes
