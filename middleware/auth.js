@@ -1,26 +1,24 @@
 import jwt from 'jsonwebtoken';
+import User from '../models/User.js';
 
-export default function authMiddleware(req, res, next) {
-    const authHeader = req.headers['authorization'];
-    console.log('Authorization Header:', authHeader);
+export async function authMiddleware(req, res, next) {
+  const authHeader = req.header('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ message: 'Token manquant ou invalide.' });
+  }
 
-    if (!authHeader) {
-        return res.status(401).json({ message: 'Accès refusé. Aucun token fourni.' });
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id).select('email preferences'); // Sélectionnez les champs nécessaires
+
+    if (!user) {
+      return res.status(404).json({ message: 'Utilisateur non trouvé.' });
     }
 
-    const token = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
-
-    if (!token) {
-        return res.status(401).json({ message: 'Token manquant. Accès non autorisé.' });
-    }
-
-    try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET); // Vérifie et décode le token
-        req.user = decoded; // Stocke les données dans req.user
-        console.log('req.user:', req.user);
-        next();
-    } catch (error) {
-        console.error('Erreur lors de la vérification du token:', error.message);
-        res.status(401).json({ message: 'Token invalide.' });
-    }
+    req.user = user; // Ajoutez les informations utilisateur complètes à req.user
+    next();
+  } catch (error) {
+    res.status(401).json({ message: 'Token invalide.' });
+  }
 }

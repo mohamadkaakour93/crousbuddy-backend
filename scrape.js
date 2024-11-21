@@ -118,12 +118,17 @@ async function sendEmail(to, subject, text) {
   
   // Fonction pour ajouter un utilisateur à la queue
   export function addUserToQueue(user) {
-    if (!userQueue.find((u) => u.email === user.email)) {
-      userQueue.push(user);
-      console.log(`Utilisateur ${user.email} ajouté à la queue.`);
-    } else {
-      console.log(`Utilisateur ${user.email} est déjà en cours de traitement.`);
-    }
+    if (!user.email || !user.preferences.city || !user.preferences.occupationModes) {
+        console.error('Données utilisateur incomplètes :', user);
+        return;
+      }
+    
+      if (!userQueue.find((u) => u.email === user.email)) {
+        userQueue.push(user);
+        console.log(`Utilisateur ${user.email} ajouté à la queue.`);
+      } else {
+        console.log(`Utilisateur ${user.email} est déjà en cours de traitement.`);
+      }
   }
   
   // Intervalle global pour traiter la queue

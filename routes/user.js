@@ -8,12 +8,20 @@ const router = express.Router();
 
 router.post('/search', authMiddleware, async (req, res) => {
     try {
-      const user = {
-        email: req.user.email,
-        preferences: req.user.preferences,
-      };
+      const { city, occupationModes } = req.body;
   
-      addUserToQueue(user); // Ajouter l'utilisateur à la queue pour le scraping
+      if (!city || !occupationModes) {
+        return res.status(400).json({ message: 'Ville et mode d\'occupation sont requis.' });
+      }
+  
+      addUserToQueue({
+        email: req.user.email, // Email récupéré depuis le middleware
+        preferences: {
+          city,
+          occupationModes,
+        },
+      });
+  
       res.status(200).json({ message: 'La recherche a été lancée. Vous recevrez un e-mail dès qu’un logement sera trouvé.' });
     } catch (error) {
       console.error('Erreur lors de la recherche :', error.message);
