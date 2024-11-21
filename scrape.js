@@ -135,5 +135,5 @@ L'équipe CROUS Buddy
   };
 
   // Lancer le scraping toutes les 5 minutes
-  userState.intervalId = setInterval(performScrape, 300000); // 5 minutes
+  userState.intervalId = setInterval(performScrape, 30000); // 5 minutes
 }
