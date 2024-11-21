@@ -71,7 +71,7 @@ async function generateCrousUrl(city, occupationModes) {
 }
 
 // Fonction principale de scraping
-async function scrapeWebsite(user) {
+export async function scrapeWebsite(user) {
   const { email, preferences } = user;
   const { city, occupationModes } = preferences;
 
@@ -138,7 +138,7 @@ L'équipe CROUS Buddy
 }
 
 // Traitement de la file d'attente
-userQueue.process(async (job) => {
+userQueue.process(5, async (job) => {
   const user = job.data;
   if (!userStates.has(user.email)) {
     userStates.set(user.email, {
