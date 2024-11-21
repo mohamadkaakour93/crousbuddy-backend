@@ -5,7 +5,20 @@ import Queue from "bull";
 import Redis from "ioredis";
 
 // Configuration Redis
-const redisClient = new Redis();
+const redisUrl = process.env.REDIS_URL || "redis://red-csvhhobtq21c73ep4efg:6379";
+const redisClient = new Redis(redisUrl);
+
+// Gestion des erreurs Redis
+redisClient.on("error", (err) => {
+  console.error("Erreur Redis :", err);
+});
+
+// Configuration Bull Queue
+const userQueue = new Queue("userQueue", redisUrl);
+
+userQueue.on("error", (err) => {
+  console.error("Erreur dans la file d'attente :", err);
+});
 
 // Configuration SMTP
 const transporter = nodemailer.createTransport({
@@ -91,11 +104,6 @@ async function scrapeWebsite(user) {
     throw error;
   }
 }
-
-// File d'attente avec Bull
-const userQueue = new Queue("userQueue", {
-  redis: { host: "127.0.0.1", port: 6379 },
-});
 
 // Traitement de la file d'attente
 userQueue.process(async (job) => {
