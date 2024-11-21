@@ -1,7 +1,15 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import nodemailer from 'nodemailer';
-import pLimit from 'p-limit';
+import Queue from 'bull';
+
+// Configuration de Redis pour Bull
+const scrapeQueue = new Queue('scrapeQueue', {
+  redis: { host: '127.0.0.1', port: 6379 }, // Remplacez par vos informations Redis
+});
+
+// État global
+const cityCache = new Map(); // Cache pour les coordonnées des villes
 
 // Configuration SMTP
 const transporter = nodemailer.createTransport({
@@ -13,14 +21,6 @@ const transporter = nodemailer.createTransport({
     pass: 'q4mj6RNO507thbTW',
   },
 });
-
-// État global pour la file d'attente
-const userQueue = [];
-const userStates = new Map();
-const cityCache = new Map();
-
-// Limitation de concurrence
-const limit = pLimit(5); // Limite à 5 utilisateurs en parallèle
 
 // Fonction pour envoyer un e-mail
 async function sendEmail(to, subject, text) {
@@ -63,20 +63,8 @@ async function generateCrousUrl(city, occupationModes) {
   return `https://trouverunlogement.lescrous.fr/tools/37/search?${params.toString()}`;
 }
 
-// Fonction pour effectuer le scraping
-async function performScrape(user) {
-  const { email, preferences } = user;
-  const { city, occupationModes } = preferences;
-
-  if (!userStates.has(email)) {
-    userStates.set(email, {
-      notifiedLogements: new Set(),
-      noLogementMailSent: false,
-    });
-  }
-
-  const userState = userStates.get(email);
-
+// Fonction de scraping
+async function performScrape({ email, city, occupationModes }) {
   try {
     const url = await generateCrousUrl(city, occupationModes);
     console.log(`[${new Date().toISOString()}] Scraping pour ${email} : ${url}`);
@@ -91,30 +79,23 @@ async function performScrape(user) {
       logements.push({ title, link });
     });
 
-    const nouveauxLogements = logements.filter(
-      (logement) => !userState.notifiedLogements.has(logement.link)
-    );
-
-    if (nouveauxLogements.length > 0) {
-      for (const logement of nouveauxLogements)
-        userState.notifiedLogements.add(logement.link);
-
+    if (logements.length > 0) {
       const message = `
 Bonjour,
 
-Nous avons trouvé ${nouveauxLogements.length} nouveaux logements correspondant à vos critères :
+Nous avons trouvé ${logements.length} nouveaux logements correspondant à vos critères :
 - Ville : ${city}
 - Mode d'occupation : ${occupationModes}
 
 Voici les détails :
-${nouveauxLogements.map((l) => `- ${l.title}\nLien : ${l.link}`).join('\n\n')}
+${logements.map((l) => `- ${l.title}\nLien : ${l.link}`).join('\n\n')}
 
 Cordialement,
 L'équipe CROUS Buddy
 `;
       await sendEmail(email, 'Nouveaux logements trouvés', message);
       console.log(`Logements trouvés pour ${email}. Notification envoyée.`);
-    } else if (!userState.noLogementMailSent) {
+    } else {
       const noLogementMessage = `
 Bonjour,
 
@@ -125,35 +106,20 @@ Cordialement,
 L'équipe CROUS Buddy
 `;
       await sendEmail(email, 'Aucun logement disponible', noLogementMessage);
-      userState.noLogementMailSent = true;
       console.log(`Notification "aucun logement" envoyée à ${email}.`);
-    } else {
-      console.log(`Aucun logement trouvé pour ${email}. Recherche toujours en cours.`);
     }
   } catch (error) {
     console.error(`Erreur lors du scraping pour ${email} :`, error.message);
   }
 }
 
-// Fonction pour ajouter un utilisateur à la file d'attente
-export function scrapeWebsite(user) {
-  userQueue.push(user);
-  console.log(`Utilisateur ${user.email} ajouté à la file d'attente.`);
+// Ajouter une tâche à la file d'attente
+export function addToQueue(email, preferences) {
+  scrapeQueue.add({ email, ...preferences });
 }
 
-// Fonction pour traiter la file d'attente
-async function processQueue() {
-  if (userQueue.length === 0) {
-    console.log('La file d\'attente est vide.');
-    return;
-  }
-
-  console.log(`Traitement de la file d'attente : ${userQueue.length} utilisateur(s) en attente.`);
-  await Promise.all(userQueue.map((user) => limit(() => performScrape(user))));
-
-  // Une fois le traitement terminé, vide la queue
-  userQueue.length = 0;
-}
-
-// Lancer un intervalle pour traiter la file d'attente toutes les 30 secondes
-setInterval(processQueue, 30000);
+// Traiter la file d'attente
+scrapeQueue.process(async (job) => {
+  const { email, city, occupationModes } = job.data;
+  await performScrape({ email, city, occupationModes });
+});
