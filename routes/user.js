@@ -106,7 +106,18 @@ const router = express.Router();
   });
   
 
-
+router.get('/me', authMiddleware, async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id).select('-password');
+        if (!user) {
+            return res.status(404).json({ message: 'Utilisateur non trouvé.' });
+        }
+        res.status(200).json(user);
+    } catch (error) {
+        console.error('Erreur lors de la récupération du profil utilisateur:', error);
+        res.status(500).json({ message: 'Erreur serveur.' });
+    }
+});
 
 // Mettre à jour le profil utilisateur (PUT /api/user/me)
 router.put('/me', authMiddleware, async (req, res) => {
