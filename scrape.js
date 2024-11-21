@@ -1,9 +1,6 @@
 import axios from "axios";
 import * as cheerio from "cheerio";
 import nodemailer from "nodemailer";
-import express from "express";
-import authMiddleware from "../middleware/auth.js"; // Middleware d'authentification
-import User from "../models/User.js"; // Modèle User
 
 // État pour chaque utilisateur connecté
 const userStates = new Map();
