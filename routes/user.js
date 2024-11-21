@@ -5,7 +5,7 @@ import { scrapeWebsite } from '../scrape.js';
 import { authMiddleware } from '../middleware/auth.js';
 const router = express.Router();
 
-/*router.post('/search', authMiddleware, async (req, res) => {
+router.post('/search', authMiddleware, async (req, res) => {
     try {
       const userId = req.user.id; // ID de l'utilisateur connecté récupéré depuis le middleware
       const user = await User.findById(userId);
@@ -46,48 +46,9 @@ const router = express.Router();
         message: "Erreur serveur lors de la recherche.",
       });
     }
-  });*/ 
-
-router.post("/search", authMiddleware, async (req, res) => {
-    try {
-      const userId = req.user.id;
-      const user = await User.findById(userId);
-  
-      if (!user) {
-        return res.status(404).json({ message: "Utilisateur non trouvé." });
-      }
-  
-      const { city, occupationModes } = req.body;
-  
-      if (!city || !occupationModes) {
-        return res.status(400).json({
-          message: "Les champs 'city' et 'occupationModes' sont obligatoires.",
-        });
-      }
-  
-      user.preferences.city = city;
-      user.preferences.occupationModes = occupationModes;
-      await user.save();
-  
-      scrapeWebsite({
-        email: user.email,
-        preferences: {
-          city: user.preferences.city,
-          occupationModes: user.preferences.occupationModes,
-        },
-      });
-  
-      return res.status(200).json({
-        message:
-          "La recherche a été lancée. Vous recevrez un e-mail dès qu’un logement sera trouvé.",
-      });
-    } catch (error) {
-      console.error("Erreur lors de la recherche :", error.message);
-      return res.status(500).json({
-        message: "Erreur serveur lors de la recherche.",
-      });
-    }
   });
+
+
   
 
 router.get('/me', authMiddleware, async (req, res) => {
