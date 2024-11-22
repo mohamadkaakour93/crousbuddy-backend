@@ -128,8 +128,8 @@ router.post('/auth/send-reset-password-email', async (req, res) => {
         port: 587,
         secure: false,
         auth: {
-          user: '804025002@smtp-brevo.com',
-          pass: 'q4mj6RNO507thbTW',
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
         },
       });
   
