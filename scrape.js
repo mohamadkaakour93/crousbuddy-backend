@@ -46,7 +46,9 @@ async function sendEmail(to, subject, text) {
 
 // Fonction pour obtenir les coordonnées (bounds) d'une ville
 async function getCityBounds(city) {
-  if (cityCache.has(city)) return cityCache.get(city);
+  if (cityCache.has(city)){
+    return cityCache.get(city);
+  }
 
   try {
     const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(city)}`;
