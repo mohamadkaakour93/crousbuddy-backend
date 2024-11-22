@@ -7,15 +7,7 @@ import User from '../models/User.js';
 
 const router = express.Router();
 
-const transporter = nodemailer.createTransport({
-  host: 'smtp-relay.brevo.com',
-  port: 587,
-  secure: false,
-  auth: {
-    user: '804025002@smtp-brevo.com',
-    pass: 'q4mj6RNO507thbTW',
-  },
-});
+
 
 // Middleware pour vérifier le token JWT
 const authMiddleware = (req, res, next) => {
@@ -112,41 +104,78 @@ router.post(
     }
 );
 
-// Endpoint pour réinitialiser le mot de passe
-router.post('/reset-password', async (req, res) => {
+router.post('/auth/send-reset-password-email', async (req, res) => {
     const { email } = req.body;
   
     try {
+      // Vérifier si l'utilisateur existe
       const user = await User.findOne({ email });
       if (!user) {
-        return res.status(404).json({ message: 'Utilisateur introuvable.' });
+        return res.status(404).json({ message: "Utilisateur introuvable." });
       }
   
-      // Exemple de lien de réinitialisation (générer un token sécurisé ici)
-      const resetToken = jwt.sign(
-        { userId: user._id }, // Payload avec des données utilisateur
-        process.env.JWT_SECRET, // Votre clé secrète pour JWT
-        { expiresIn: '1h' } // Expiration du token
-      );
-      
-      console.log('Token généré :', resetToken);
-      const resetLink = `https://crousbuddy-frontend.com/reset-password?token=${resetToken}`;
-  
-      // Envoi de l'email
-      await transporter.sendMail({
-        from: '"CROUS Buddy" <crousbuddy@gmail.com>',
-        to: email,
-        subject: 'Réinitialisation de votre mot de passe',
-        text: `Cliquez sur le lien suivant pour réinitialiser votre mot de passe : ${resetLink}`,
+      // Générer un token de réinitialisation
+      const resetToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+        expiresIn: '1h', // Token valide pour 1 heure
       });
   
-      res.status(200).json({ message: 'Lien de réinitialisation envoyé par email.' });
+      // Construire le lien de réinitialisation
+      const resetLink = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
+  
+      // Envoyer l'e-mail
+      const transporter = nodemailer.createTransport({
+        host: 'smtp-relay.brevo.com',
+        port: 587,
+        secure: false,
+        auth: {
+          user: '804025002@smtp-brevo.com',
+          pass: 'q4mj6RNO507thbTW',
+        },
+      });
+  
+      const mailOptions = {
+        from: '"CROUS Buddy" <crousbuddy@gmail.com>',
+        to: email,
+        subject: 'Réinitialisation du mot de passe',
+        text: `Bonjour,\n\nCliquez sur le lien suivant pour réinitialiser votre mot de passe :\n${resetLink}\n\nCe lien est valide pendant 1 heure.\n\nCordialement,\nL'équipe CROUS Buddy`,
+      };
+  
+      await transporter.sendMail(mailOptions);
+  
+      res.json({ message: 'E-mail de réinitialisation envoyé avec succès.' });
     } catch (error) {
-      console.error('Erreur lors de la réinitialisation du mot de passe :', error);
-      res.status(500).json({ message: 'Erreur interne du serveur.' });
+      console.error('Erreur lors de l\'envoi de l\'e-mail de réinitialisation :', error.message);
+      res.status(500).json({ message: 'Erreur lors de l\'envoi de l\'e-mail.' });
+    }
+  }); 
+
+  router.post('/auth/reset-password', async (req, res) => {
+    const { token, newPassword } = req.body;
+  
+    try {
+      // Vérifier le token
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const userId = decoded.id;
+  
+      // Trouver l'utilisateur
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({ message: "Utilisateur introuvable." });
+      }
+  
+      // Mettre à jour le mot de passe
+      user.password = await bcrypt.hash(newPassword, 10); // Hasher le nouveau mot de passe
+      await user.save();
+  
+      res.json({ message: 'Mot de passe réinitialisé avec succès.' });
+    } catch (error) {
+      console.error('Erreur lors de la réinitialisation du mot de passe :', error.message);
+      res.status(400).json({ message: 'Token invalide ou expiré.' });
     }
   });
   
+
+
 
 
 export default router;
