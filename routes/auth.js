@@ -5,7 +5,6 @@ import { check, validationResult } from 'express-validator';
 import nodemailer from "nodemailer";
 import User from '../models/User.js';
 
-const jwt = require('jsonwebtoken');
 const router = express.Router();
 
 const transporter = nodemailer.createTransport({
