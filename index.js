@@ -5,6 +5,12 @@ import authRoutes from './routes/auth.js';
 import cors from 'cors';
 import userRoutes from './routes/user.js';
 import attestationRoutes from './routes/attestaion.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Résolution de __dirname pour ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 
 
