@@ -4,6 +4,8 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/auth.js';
 import cors from 'cors';
 import userRoutes from './routes/user.js';
+import attestationRoutes from './routes/attestation.js';
+
 
 dotenv.config();
 
@@ -34,6 +36,7 @@ mongoose.connect(process.env.MONGO_URI)
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
+app.use('/attestation', attestationRoutes);
 
 
 // Middleware global pour gérer les erreurs
