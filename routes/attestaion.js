@@ -1,10 +1,10 @@
 import express from 'express';
 import Host from '../models/Host.js';
-import { generatePDF } from '../utils/pdfGenerator.js';
 import { sendEmail } from '../utils/emailService.js';
 import { authMiddleware } from '../middleware/auth.js';
 import Student from '../models/Student.js';
 import Attestaion from '../models/Attestaion.js';
+const generatePDF = require('./utils/pdfGenerator');
 const router = express.Router();
 
 // Recherche des hébergeurs avec authentification
@@ -28,26 +28,38 @@ router.get('/match-hosts/:city', authMiddleware, async (req, res) => {
   });
   
 
-// Génération d'attestation avec authentification
-router.post('/auto-generate-attestation', authMiddleware, async (req, res) => {
-    const { student, hostId } = req.body;
   
-    try {
-      const host = await Host.findById(hostId);
-      if (!host || host.currentAttestations >= host.maxAttestations) {
-        return res.status(400).json({ error: 'Hébergeur non disponible.' });
+
+  router.post('/auto-generate-attestation', async (req, res) => {
+      const { student, hostId } = req.body;
+  
+      try {
+          const host = await Host.findById(hostId);
+          if (!host || host.currentAttestations >= host.maxAttestations) {
+              return res.status(400).json({ error: 'Hébergeur non disponible.' });
+          }
+  
+          // Générer le PDF
+          const filePath = await generatePDF(host, student);
+  
+          // Envoyer l'email avec l'attestation en pièce jointe
+          await sendEmail(
+              student.email,
+              'Votre attestation d’hébergement',
+              'Veuillez trouver ci-joint votre attestation d’hébergement.',
+              filePath
+          );
+  
+          // Mettre à jour le compteur d'attestations de l'hébergeur
+          host.currentAttestations += 1;
+          await host.save();
+  
+          res.status(200).json({ message: 'Attestation générée avec succès.', filePath });
+      } catch (err) {
+          console.error('Erreur lors de la génération de l’attestation :', err);
+          res.status(500).json({ error: err.message });
       }
-  
-      const filePath = await generatePDF(host, student);
-      await sendEmail(student.email, 'Votre attestation d’hébergement', 'Veuillez trouver ci-joint votre attestation d’hébergement.', filePath);
-  
-      host.currentAttestations += 1;
-      await host.save();
-  
-      res.status(200).json({ message: 'Attestation générée avec succès.', filePath });
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
   });
+  
   
 export default router;

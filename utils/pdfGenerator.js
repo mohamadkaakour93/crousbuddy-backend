@@ -1,22 +1,54 @@
-import fs from 'fs';
-import PDFDocument from 'pdfkit';
+const PDFDocument = require('pdfkit');
+const fs = require('fs');
+const path = require('path');
 
-export function generatePDF(host, student) {
-  return new Promise((resolve, reject) => {
-    const doc = new PDFDocument();
-    const filePath = `./attestations/attestation_${Date.now()}.pdf`;
+function generatePDF(host, student) {
+    return new Promise((resolve, reject) => {
+        // Vérifier et créer le répertoire des attestations si nécessaire
+        const outputDir = path.join(__dirname, '../attestations');
+        if (!fs.existsSync(outputDir)) {
+            fs.mkdirSync(outputDir, { recursive: true });
+        }
 
-    doc.pipe(fs.createWriteStream(filePath));
+        // Définir le chemin du fichier PDF
+        const fileName = `attestation_${Date.now()}.pdf`;
+        const filePath = path.join(outputDir, fileName);
 
-    doc.fontSize(20).text('ATTESTATION D\'HÉBERGEMENT', { align: 'center' }).moveDown(2);
-    doc.fontSize(14).text(`Je soussigné(e) ${host.name}, né(e) le ${host.birthDate}, à ${host.city}, déclare sur l'honneur héberger ${student.name}, né(e) le ${student.birthDate}, à ${student.city}, depuis le ${new Date().toLocaleDateString()}.`, { align: 'left' });
-    doc.moveDown();
-    doc.text(`Adresse : ${host.address}`);
-    doc.text(`Taille de la maison : ${host.houseSize}m²`);
-    doc.text(`Signature : ________________`, { align: 'center' });
+        // Créer un nouveau document PDF
+        const doc = new PDFDocument();
 
-    doc.end();
-    doc.on('finish', () => resolve(filePath));
-    doc.on('error', (err) => reject(err));
-  });
+        // Écriture du PDF
+        doc.pipe(fs.createWriteStream(filePath));
+
+        // Contenu du PDF
+        doc.font('Helvetica-Bold').fontSize(20).text('ATTESTATION D’HÉBERGEMENT', { align: 'center' });
+        doc.moveDown();
+        
+        doc.font('Helvetica').fontSize(12).text(`Je soussigné(e), ${host.name}, né(e) le ${host.birthDate}, à ${host.birthPlace},`);
+        doc.text(`déclare sur l'honneur héberger à mon domicile :`);
+        doc.moveDown();
+
+        doc.text(`Prénom et Nom : ${student.name}`);
+        doc.text(`Date de naissance : ${student.birthDate}`);
+        doc.text(`Lieu de naissance : ${student.birthPlace}`);
+        doc.moveDown();
+
+        doc.text(`Adresse : ${host.address}`);
+        doc.text(`Code postal : ${host.postalCode}`);
+        doc.text(`Ville : ${host.city}`);
+        doc.moveDown();
+
+        doc.text(`Depuis le : ${new Date().toLocaleDateString('fr-FR')}`);
+        doc.text(`Fait à : ${host.city}, le ${new Date().toLocaleDateString('fr-FR')}`);
+        doc.moveDown(2);
+
+        doc.text('Signature : ___________________________', { align: 'left' });
+        doc.end();
+
+        // Gestion des événements
+        doc.on('finish', () => resolve(filePath));
+        doc.on('error', (err) => reject(err));
+    });
 }
+
+module.exports = generatePDF;

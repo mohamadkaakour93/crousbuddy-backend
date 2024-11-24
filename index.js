@@ -39,6 +39,10 @@ app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/attestation', attestationRoutes);
 
+// Servir les PDFs statiques
+app.use('/attestations', express.static(path.join(__dirname, 'attestations')));
+
+
 
 // Middleware global pour gérer les erreurs
 app.use((err, req, res, next) => {
