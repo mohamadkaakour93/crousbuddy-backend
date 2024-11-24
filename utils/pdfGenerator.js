@@ -29,9 +29,10 @@ async function generatePDF(host, student) {
         // Lancer Puppeteer pour générer le PDF
         const browser = await puppeteer.launch({
             headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox'],
-            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath(),
+            args: ['--no-sandbox', '--disable-setuid-sandbox'], // Nécessaire pour les environnements comme Render
+            executablePath: puppeteer.executablePath(), // Utilise la version intégrée de Puppeteer
           });
+          
         const page = await browser.newPage();
         await page.setContent(htmlWithValues);
 
