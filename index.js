@@ -4,7 +4,8 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/auth.js';
 import cors from 'cors';
 import userRoutes from './routes/user.js';
-import attestationRoutes from './routes/attestation.js';
+import attestationRoutes from './routes/attestaion.js';
+
 
 
 dotenv.config();
