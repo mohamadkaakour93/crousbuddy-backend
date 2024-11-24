@@ -28,12 +28,11 @@ async function generatePDF(host, student) {
 
         // Lancer Puppeteer pour générer le PDF
         const browser = await puppeteer.launch({
-            headless: true, // Mode headless
-            args: ['--no-sandbox', '--disable-setuid-sandbox'], // Arguments pour Render
-            executablePath: process.env.CHROME_EXECUTABLE_PATH || puppeteer.executablePath(), // Chemin de Chromium
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox'],
+            executablePath: puppeteer.executablePath(), // Utilise la version intégrée de Chromium
         });
-        
-          
+
         const page = await browser.newPage();
         await page.setContent(htmlWithValues);
 
