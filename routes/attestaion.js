@@ -4,7 +4,7 @@ import { sendEmail } from '../utils/emailService.js';
 import { authMiddleware } from '../middleware/auth.js';
 import Student from '../models/Student.js';
 import Attestaion from '../models/Attestaion.js';
-const generatePDF = require('./utils/pdfGenerator');
+import generatePDF from '../utils/pdfGenerator.js';
 const router = express.Router();
 
 // Recherche des hébergeurs avec authentification

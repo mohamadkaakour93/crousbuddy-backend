@@ -1,6 +1,11 @@
-const PDFDocument = require('pdfkit');
-const fs = require('fs');
-const path = require('path');
+import PDFDocument from 'pdfkit';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Résoudre __dirname pour les modules ES
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 function generatePDF(host, student) {
     return new Promise((resolve, reject) => {
@@ -51,4 +56,5 @@ function generatePDF(host, student) {
     });
 }
 
-module.exports = generatePDF;
+// Exporter la fonction en ES modules
+export default generatePDF;
