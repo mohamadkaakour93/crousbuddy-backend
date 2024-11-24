@@ -38,10 +38,14 @@ router.get('/match-hosts/:city', authMiddleware, async (req, res) => {
           if (!host || host.currentAttestations >= host.maxAttestations) {
               return res.status(400).json({ error: 'Hébergeur non disponible.' });
           }
+          console.time('PDF Generation'); // Démarrer le chronomètre pour la génération du PDF
+    
   
           // Générer le PDF
           const filePath = await generatePDF(host, student);
+          console.timeEnd('PDF Generation'); 
   
+          console.time('Email Sending');
           // Envoyer l'email avec l'attestation en pièce jointe
           await sendEmail(
               student.email,
@@ -49,6 +53,7 @@ router.get('/match-hosts/:city', authMiddleware, async (req, res) => {
               'Veuillez trouver ci-joint votre attestation d’hébergement.',
               filePath
           );
+          console.timeEnd('Email Sending');
   
           // Mettre à jour le compteur d'attestations de l'hébergeur
           host.currentAttestations += 1;
