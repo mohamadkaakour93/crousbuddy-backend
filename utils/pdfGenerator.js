@@ -1,6 +1,6 @@
-import PDFDocument from 'pdfkit';
 import fs from 'fs';
 import path from 'path';
+import pdf from 'html-pdf';
 import { fileURLToPath } from 'url';
 
 // Résoudre __dirname pour les modules ES
@@ -9,8 +9,11 @@ const __dirname = path.dirname(__filename);
 
 function generatePDF(host, student) {
     return new Promise((resolve, reject) => {
-        // Vérifier et créer le répertoire des attestations si nécessaire
+        // Définir les chemins pour les templates et les PDFs
+        const templatePath = path.join(__dirname, '../templates/attestationTemplate.html');
         const outputDir = path.join(__dirname, '../attestations');
+
+        // Vérifier et créer le répertoire des attestations si nécessaire
         if (!fs.existsSync(outputDir)) {
             fs.mkdirSync(outputDir, { recursive: true });
         }
@@ -19,42 +22,34 @@ function generatePDF(host, student) {
         const fileName = `attestation_${Date.now()}.pdf`;
         const filePath = path.join(outputDir, fileName);
 
-        // Créer un nouveau document PDF
-        const doc = new PDFDocument();
+        // Charger le modèle HTML
+        fs.readFile(templatePath, 'utf8', (err, htmlTemplate) => {
+            if (err) {
+                return reject(`Erreur lors du chargement du modèle HTML : ${err.message}`);
+            }
 
-        // Écriture du PDF
-        doc.pipe(fs.createWriteStream(filePath));
+            // Remplacer les valeurs dynamiques dans le modèle HTML
+            const htmlWithValues = htmlTemplate
+                .replace('{{hostName}}', host.name)
+                .replace('{{hostBirthDate}}', host.birthDate)
+                .replace('{{hostBirthPlace}}', host.birthPlace || 'N/A')
+                .replace('{{studentName}}', student.name)
+                .replace('{{studentBirthDate}}', student.birthDate)
+                .replace('{{studentBirthPlace}}', student.birthPlace || 'N/A')
+                .replace('{{hostAddress}}', host.address)
+                .replace('{{hostPostalCode}}', host.postalCode)
+                .replace('{{hostCity}}', host.city)
+                .replace('{{currentDate}}', new Date().toLocaleDateString('fr-FR'));
 
-        // Contenu du PDF
-        doc.font('Helvetica-Bold').fontSize(20).text('ATTESTATION D’HÉBERGEMENT', { align: 'center' });
-        doc.moveDown();
-        
-        doc.font('Helvetica').fontSize(12).text(`Je soussigné(e), ${host.name}, né(e) le ${host.birthDate}, à ${host.birthPlace},`);
-        doc.text(`déclare sur l'honneur héberger à mon domicile :`);
-        doc.moveDown();
-
-        doc.text(`Prénom et Nom : ${student.name}`);
-        doc.text(`Date de naissance : ${student.birthDate}`);
-        doc.text(`Lieu de naissance : ${student.birthPlace}`);
-        doc.moveDown();
-
-        doc.text(`Adresse : ${host.address}`);
-        doc.text(`Code postal : ${host.postalCode}`);
-        doc.text(`Ville : ${host.city}`);
-        doc.moveDown();
-
-        doc.text(`Depuis le : ${new Date().toLocaleDateString('fr-FR')}`);
-        doc.text(`Fait à : ${host.city}, le ${new Date().toLocaleDateString('fr-FR')}`);
-        doc.moveDown(2);
-
-        doc.text('Signature : ___________________________', { align: 'left' });
-        doc.end();
-
-        // Gestion des événements
-        doc.on('finish', () => resolve(filePath));
-        doc.on('error', (err) => reject(err));
+            // Générer le PDF à partir du HTML
+            pdf.create(htmlWithValues, { format: 'A4' }).toFile(filePath, (err, res) => {
+                if (err) {
+                    return reject(`Erreur lors de la génération du PDF : ${err.message}`);
+                }
+                resolve(filePath);
+            });
+        });
     });
 }
 
-// Exporter la fonction en ES modules
 export default generatePDF;

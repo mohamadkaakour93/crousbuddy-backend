@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attestation d'Hébergement</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+    }
+    .container {
+      border: 1px solid #000;
+      padding: 20px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    h1 {
+      text-align: center;
+      font-size: 24px;
+      margin-bottom: 20px;
+    }
+    p {
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .signature {
+      margin-top: 40px;
+      text-align: left;
+    }
+    .signature-line {
+      margin-top: 20px;
+      width: 50%;
+      border-top: 1px solid #000;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>ATTESTATION D’HÉBERGEMENT</h1>
+    <p>Je soussigné(e), <strong>{{hostName}}</strong>, né(e) le <strong>{{hostBirthDate}}</strong>, à <strong>{{hostBirthPlace}}</strong>,</p>
+    <p>déclare sur l'honneur héberger à mon domicile :</p>
+    <p><strong>Prénom et Nom :</strong> {{studentName}}<br>
+    <strong>Date de naissance :</strong> {{studentBirthDate}}<br>
+    <strong>Lieu de naissance :</strong> {{studentBirthPlace}}</p>
+    <p>À l'adresse suivante :</p>
+    <p><strong>{{hostAddress}}</strong><br>
+    <strong>{{hostPostalCode}} {{hostCity}}</strong></p>
+    <p>Depuis le : <strong>{{startDate}}</strong></p>
+    <p>Fait à : <strong>{{hostCity}}</strong>, le <strong>{{currentDate}}</strong></p>
+    <div class="signature">
+      <p>Signature :</p>
+      <div class="signature-line"></div>
+    </div>
+  </div>
+</body>
+</html>
