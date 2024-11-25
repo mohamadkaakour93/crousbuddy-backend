@@ -1,19 +1,19 @@
-import puppeteer from 'puppeteer';
 import fs from 'fs';
 import path from 'path';
+import pdf from 'html-pdf';
 import { fileURLToPath } from 'url';
 
-// Résoudre __dirname
+// Résoudre __dirname pour les modules ES
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-async function generatePDF(host, student) {
-  try {
+function generatePDF(host, student) {
+  return new Promise((resolve, reject) => {
     // Charger le modèle HTML
     const templatePath = path.join(__dirname, '../templates/attestationTemplate.html');
     const htmlTemplate = fs.readFileSync(templatePath, 'utf8');
 
-    // Remplacer les valeurs dynamiques dans le modèle HTML
+    // Remplacer les variables dynamiques dans le HTML
     const htmlWithValues = htmlTemplate
       .replace('{{hostName}}', host.name)
       .replace('{{hostBirthDate}}', host.birthDate)
@@ -26,16 +26,7 @@ async function generatePDF(host, student) {
       .replace('{{hostCity}}', host.city)
       .replace('{{currentDate}}', new Date().toLocaleDateString('fr-FR'));
 
-    // Configurer Puppeteer avec des arguments adaptés à l'environnement Render
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'], // Arguments pour Render
-    });
-
-    const page = await browser.newPage();
-    await page.setContent(htmlWithValues, { waitUntil: 'load' });
-
-    // Définir le chemin de sortie du fichier PDF
+    // Définir le chemin du fichier PDF
     const outputDir = path.join(__dirname, '../attestations');
     if (!fs.existsSync(outputDir)) {
       fs.mkdirSync(outputDir, { recursive: true });
@@ -43,19 +34,15 @@ async function generatePDF(host, student) {
     const fileName = `attestation_${Date.now()}.pdf`;
     const filePath = path.join(outputDir, fileName);
 
-    // Générer le fichier PDF
-    await page.pdf({
-      path: filePath,
-      format: 'A4',
-      printBackground: true,
+    // Générer le PDF
+    pdf.create(htmlWithValues).toFile(filePath, (err, res) => {
+      if (err) {
+        reject(new Error(`Erreur lors de la génération du PDF : ${err.message}`));
+      } else {
+        resolve(filePath);
+      }
     });
-
-    await browser.close();
-
-    return filePath;
-  } catch (err) {
-    throw new Error(`Erreur lors de la génération du PDF : ${err.message}`);
-  }
+  });
 }
 
 export default generatePDF;
