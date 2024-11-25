@@ -39,25 +39,65 @@ router.post(
             return res.status(400).json({ errors: errors.array() });
         }
 
-        const { email, password, preferences } = req.body;
+        const { email, password, role, preferences, name, birthDate, city, address, houseSize } = req.body;
 
         try {
             // Vérifier si l'utilisateur existe déjà
-            let user = await User.findOne({ email });
-            if (user) {
+            let existingUser = await User.findOne({ email });
+            if (existingUser) {
                 return res.status(400).json({ message: 'Utilisateur déjà enregistré.' });
             }
 
-            // Créer un nouvel utilisateur
-            const hashedPassword = await bcrypt.hash(password, 10);
-            user = new User({ email, password: hashedPassword, preferences });
+            // Valider le rôle
+            if (!['student', 'host'].includes(role)) {
+                return res.status(400).json({ message: "Le rôle doit être 'student' ou 'host'." });
+            }
 
-            await user.save();
+            // Gérer le cas d'un étudiant
+            if (role === 'student') {
+                if (!name || !birthDate || !city) {
+                    return res.status(400).json({ message: 'Les champs étudiant (name, birthDate, city) sont obligatoires.' });
+                }
 
-            // Générer un token JWT
-            const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+                // Créer un nouvel étudiant
+                const newStudent = new Student({
+                    name,
+                    birthDate,
+                    email,
+                    city,
+                });
 
-            res.json({ token });
+                await newStudent.save();
+
+                res.status(201).json({ message: 'Inscription réussie en tant qu\'étudiant.' });
+                return;
+            }
+
+            // Gérer le cas d'un hébergeur
+            if (role === 'host') {
+                if (!name || !birthDate || !city || !address || !houseSize) {
+                    return res.status(400).json({ message: 'Les champs hébergeur (name, birthDate, city, address, houseSize) sont obligatoires.' });
+                }
+
+                // Valider la taille de la maison
+                if (houseSize < 18) {
+                    return res.status(400).json({ message: 'La taille de la maison doit être d\'au moins 18m².' });
+                }
+
+                // Créer un nouvel hébergeur
+                const newHost = new Host({
+                    name,
+                    birthDate,
+                    city,
+                    address,
+                    houseSize,
+                });
+
+                await newHost.save();
+
+                res.status(201).json({ message: 'Inscription réussie en tant qu\'hébergeur.' });
+                return;
+            }
         } catch (error) {
             console.error(error.message);
             res.status(500).send('Erreur serveur.');

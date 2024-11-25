@@ -15,17 +15,15 @@ function generatePDF(host, student) {
 
     // Remplacer les variables dynamiques dans le HTML
     const htmlWithValues = htmlTemplate
-      .replace('{{hostName}}', host.name)
-      .replace('{{hostBirthDate}}', host.birthDate)
-      .replace('{{hostBirthPlace}}', host.birthPlace || 'Non spécifié')
-      .replace('{{studentName}}', student.name)
-      .replace('{{studentBirthDate}}', student.birthDate)
-      .replace('{{studentBirthPlace}}', student.birthPlace || 'Non spécifié')
-      .replace('{{hostAddress}}', host.address)
-      .replace('{{hostPostalCode}}', host.postalCode)
-      .replace('{{hostCity}}', host.city)
-      .replace('{{currentDate}}', new Date().toLocaleDateString('fr-FR'));
-
+    .replace('{{hostName}}', host.name)
+    .replace('{{hostBirthDate}}', host.birthDate)
+    .replace('{{hostAddress}}', host.address)
+    .replace('{{hostPostalCode}}', host.postalCode)
+    .replace('{{hostCity}}', host.city)
+    .replace('{{studentName}}', student.name)
+    .replace('{{studentBirthDate}}', student.birthDate)
+    .replace('{{startDate}}', new Date().toLocaleDateString('fr-FR')) // Date dynamique
+    .replace('{{currentDate}}', new Date().toLocaleDateString('fr-FR'));
     // Définir le chemin du fichier PDF
     const outputDir = path.join(__dirname, '../attestations');
     if (!fs.existsSync(outputDir)) {
